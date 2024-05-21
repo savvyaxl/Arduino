@@ -83,7 +83,6 @@ void setup()
   digitalWrite(Relay3, OFF);
   digitalWrite(Relay4, OFF);
 
-  // Serial.println("Trigger-WaterPumps_Lights_OffBoard-DS1302-RTC_Runtime.ino");
   Serial.println(__FILE__);
   Serial.println("Mode = " + String(mode));
   Serial.print("compiled: ");
