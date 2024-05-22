@@ -3,15 +3,13 @@
 // mode 2 grow
 // mode 3 flower
 // mode 4 test
-
 int mode = 2;
 
-String indexNO = "3";
-
 // Water
-int timesPerWeek = 5;
+int timesPerWeek = 2;
 int duration = 50;
 
+String indexNO = "3";
 int realStartDay = 2;            // Sunday is really 1, 2 is Monday
 int startDay = realStartDay + 5; // 1 is Sunday, WTF
 int startHour = 6;
@@ -44,7 +42,6 @@ const unsigned int MAX_MESSAGE_LENGTH = 255;
 #include <RtcDS1302.h>
 #include <TimeLib.h>
 #include <TimeAlarms.h>
-#include <stdlib.h>
 
 int Relay1 = 6;
 int Relay2 = 7;
