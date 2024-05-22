@@ -9,7 +9,7 @@ int mode = 2;
 String indexNO = "3";
 
 // Water
-int timesPerWeek = 2;
+int timesPerWeek = 5;
 int duration = 50;
 
 int realStartDay = 2;            // Sunday is really 1, 2 is Monday
@@ -45,7 +45,6 @@ const unsigned int MAX_MESSAGE_LENGTH = 255;
 #include <TimeLib.h>
 #include <TimeAlarms.h>
 #include <stdlib.h>
-#include <MemoryUsage.h>
 
 int Relay1 = 6;
 int Relay2 = 7;
@@ -58,8 +57,6 @@ int PumpSwitch2 = 12; // instant on/off
 int LightsONOFF = 0;
 int PumpONOFF1 = 0;
 int PumpONOFF2 = 0;
-
-uint8_t id_;
 
 ThreeWire myWire(DAT, SCLK, RST); // DAT/IO, CLK/SCLK, RST/CE
 RtcDS1302<ThreeWire> Rtc(myWire);
@@ -158,34 +155,34 @@ void setup()
   }
 
   // Time update
-  id_ = Alarm.alarmRepeat(dowFriday, 0, 2, 0, ReadRTC); // reset the time at midnight once a week on Sunday
+  Alarm.alarmRepeat(dowFriday, 0, 2, 0, ReadRTC); // reset the time at midnight once a week on Sunday
 
   if (mode == 1)
   {
     // Lights 18 hours
-    id_ = Alarm.alarmRepeat(6, 0, 0, LightsON);
-    id_ = Alarm.alarmRepeat(23, 55, 00, LightsOFF);
+    Alarm.alarmRepeat(6, 0, 0, LightsON);
+    Alarm.alarmRepeat(23, 55, 00, LightsOFF);
   }
 
   if (mode == 2)
   {
     // Lights grow 16 hours
-    id_ = Alarm.alarmRepeat(7, 0, 0, LightsON);
-    id_ = Alarm.alarmRepeat(23, 0, 0, LightsOFF);
+    Alarm.alarmRepeat(7, 0, 0, LightsON);
+    Alarm.alarmRepeat(23, 0, 0, LightsOFF);
   }
 
   if (mode == 3)
   {
     // Lights bud 12 hours
-    id_ = Alarm.alarmRepeat(9, 0, 0, LightsON);
-    id_ = Alarm.alarmRepeat(21, 0, 0, LightsOFF);
+    Alarm.alarmRepeat(9, 0, 0, LightsON);
+    Alarm.alarmRepeat(21, 0, 0, LightsOFF);
   }
 
   if (mode == 4)
   {
     // Lights
-    id_ = Alarm.alarmRepeat(11, 42, 0, LightsON);
-    id_ = Alarm.alarmRepeat(11, 43, 0, LightsOFF);
+    Alarm.alarmRepeat(11, 42, 0, LightsON);
+    Alarm.alarmRepeat(11, 43, 0, LightsOFF);
   }
 
   if (mode == 5)
@@ -205,8 +202,8 @@ void setup()
     Serial.print(F(":"));
     Serial.println(startMinute);
 
-    id_ = Alarm.alarmRepeat(getRealDow(startDay), startHour, startMinute, 0, WaterOn);
-    id_ = Alarm.alarmRepeat(getRealDow(startDay), startHour, startMinute, duration, WaterOff);
+    Alarm.alarmRepeat(getRealDow(startDay), startHour, startMinute, 0, WaterOn);
+    Alarm.alarmRepeat(getRealDow(startDay), startHour, startMinute, duration, WaterOff);
     calcTimes();
   }
 
@@ -273,13 +270,11 @@ void readSerial()
       if (String(message) == "Water_Return_" + indexNO + "_Off")
       {
         // Water_Return_3_Off;
-        Serial.println("Hit you");
         WaterReturnOff();
       }
       if (String(message).startsWith("Time_Set" + indexNO + "-"))
       {
-        // Time_Set3-2024,05,20,21,49,30;
-        Serial.println("Hit me");
+        // Time_Set3-2023,05,20,21,49,30;
         String temp = String(message);
         temp.remove(0, 10);
         char buf[20];
@@ -289,43 +284,12 @@ void readSerial()
       if (String(message).startsWith("Time_Get" + indexNO + "-"))
       {
         // Time_Get3-;
-        printJSON(Rtc.GetDateTime(), "getMyRTCRTC", "");
-      }
-      if (String(message).startsWith("Alarm_Get" + indexNO + "-"))
-      {
-        // Alarm_Get3-;
-        Serial.println("Hi");
-        Serial.println(Alarm.getTriggeredAlarmId());
+        printJSON(Rtc.GetDateTime(), "getMyRTC", "");
       }
       if (String(message).startsWith("Alarm_NextTrigger" + indexNO + "-"))
       {
         // Alarm_NextTrigger3-;
         printJSON("NextTrigger", DateMe(Alarm.getNextTrigger()));
-        printJSON("TriggerCount", String(Alarm.count()));
-      }
-      if (String(message).startsWith("Alarm_DeleteTriggers"))
-      {
-        // Alarm_DeleteTriggers;
-        Serial.println("Hi");
-        for (uint8_t id = 0; id < Alarm.count(); id++)
-        {
-          Alarm.free(id); // ensure all Alarms are cleared and available for allocation
-        }
-
-        // Alarm.free(Alarm.getTriggeredAlarmId());
-        // Serial.println("Alarm deleted: " + DateMe(Alarm.getNextTrigger()) + " freeing " + Alarm.getTriggeredAlarmId());
-      }
-      if (String(message).startsWith("Memory"))
-      {
-        // Memory;
-        MEMORY_PRINT_START;
-        MEMORY_PRINT_HEAPSTART;
-        MEMORY_PRINT_HEAPEND;
-        MEMORY_PRINT_STACKSTART;
-        MEMORY_PRINT_END;
-        MEMORY_PRINT_HEAPSIZE;
-        FREERAM_PRINT;
-        STACKPAINT_PRINT;
       }
     }
   }
@@ -656,12 +620,6 @@ void setMyRTC(char temp_string[])
   while (ptr)
   {
     myarray[i] = atoi(ptr);
-    //    Serial.print(i);
-    //    Serial.print(F("\t\""));
-    //    Serial.print(ptr); // this is the ASCII text we want to transform into an integer
-    //    Serial.print(F("\"\t"));
-    //    Serial.println(atoi(ptr)); // atol(ptr) will be your long int you could store in your array at position i. atol() info at http://www.cplusplus.com/reference/cstdlib/atol
-    //    Serial.println(myarray[i]);
     ptr = strtok(NULL, ",");
     i++;
   }
@@ -670,7 +628,6 @@ void setMyRTC(char temp_string[])
   Rtc.SetDateTime(myTime);
   setTime(myTime.Unix32Time());
   printJSON(myTime, "setMyRTC", "");
-  printJSON(Rtc.GetDateTime(), "setMyRTCRTC", "");
 }
 
 String DateMe(time_t t_unix_date1)
