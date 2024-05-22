@@ -159,51 +159,33 @@ void setup()
 
   // Time update
   id_ = Alarm.alarmRepeat(dowFriday, 0, 2, 0, ReadRTC); // reset the time at midnight once a week on Sunday
-  Serial.print(id_);
-  Serial.println(": Time update");
 
   if (mode == 1)
   {
     // Lights 18 hours
     id_ = Alarm.alarmRepeat(6, 0, 0, LightsON);
-    Serial.print(id_);
-    Serial.println(": Lights 18 hours, On");
     id_ = Alarm.alarmRepeat(23, 55, 00, LightsOFF);
-    Serial.print(id_);
-    Serial.println(": Lights 18 hours, Off");
   }
 
   if (mode == 2)
   {
     // Lights grow 16 hours
     id_ = Alarm.alarmRepeat(7, 0, 0, LightsON);
-    Serial.print(id_);
-    Serial.println(": Lights 16 hours, On");
     id_ = Alarm.alarmRepeat(23, 0, 0, LightsOFF);
-    Serial.print(id_);
-    Serial.println(": Lights 16 hours, Off");
   }
 
   if (mode == 3)
   {
     // Lights bud 12 hours
     id_ = Alarm.alarmRepeat(9, 0, 0, LightsON);
-    Serial.print(id_);
-    Serial.println(": Lights 12 hours, On");
     id_ = Alarm.alarmRepeat(21, 0, 0, LightsOFF);
-    Serial.print(id_);
-    Serial.println(": Lights 12 hours, Off");
   }
 
   if (mode == 4)
   {
     // Lights
     id_ = Alarm.alarmRepeat(11, 42, 0, LightsON);
-    Serial.print(id_);
-    Serial.println(": Lights, On");
     id_ = Alarm.alarmRepeat(11, 43, 0, LightsOFF);
-    Serial.print(id_);
-    Serial.println(": Lights, Off");
   }
 
   if (mode == 5)
@@ -224,11 +206,7 @@ void setup()
     Serial.println(startMinute);
 
     id_ = Alarm.alarmRepeat(getRealDow(startDay), startHour, startMinute, 0, WaterOn);
-    Serial.print(id_);
-    Serial.println(": Water, On");
     id_ = Alarm.alarmRepeat(getRealDow(startDay), startHour, startMinute, duration, WaterOff);
-    Serial.print(id_);
-    Serial.println(": Water, Off");
     calcTimes();
   }
 
