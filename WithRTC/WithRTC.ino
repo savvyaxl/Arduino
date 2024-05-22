@@ -45,6 +45,7 @@ const unsigned int MAX_MESSAGE_LENGTH = 255;
 #include <TimeLib.h>
 #include <TimeAlarms.h>
 #include <stdlib.h>
+#include <MemoryUsage.h>
 
 int Relay1 = 6;
 int Relay2 = 7;
@@ -57,6 +58,8 @@ int PumpSwitch2 = 12; // instant on/off
 int LightsONOFF = 0;
 int PumpONOFF1 = 0;
 int PumpONOFF2 = 0;
+
+uint8_t id_;
 
 ThreeWire myWire(DAT, SCLK, RST); // DAT/IO, CLK/SCLK, RST/CE
 RtcDS1302<ThreeWire> Rtc(myWire);
@@ -155,34 +158,52 @@ void setup()
   }
 
   // Time update
-  Alarm.alarmRepeat(dowFriday, 0, 2, 0, ReadRTC); // reset the time at midnight once a week on Sunday
+  id_ = Alarm.alarmRepeat(dowFriday, 0, 2, 0, ReadRTC); // reset the time at midnight once a week on Sunday
+  Serial.print(id_);
+  Serial.println(": Time update");
 
   if (mode == 1)
   {
     // Lights 18 hours
-    Alarm.alarmRepeat(6, 0, 0, LightsON);
-    Alarm.alarmRepeat(23, 55, 00, LightsOFF);
+    id_ = Alarm.alarmRepeat(6, 0, 0, LightsON);
+    Serial.print(id_);
+    Serial.println(": Lights 18 hours, On");
+    id_ = Alarm.alarmRepeat(23, 55, 00, LightsOFF);
+    Serial.print(id_);
+    Serial.println(": Lights 18 hours, Off");
   }
 
   if (mode == 2)
   {
     // Lights grow 16 hours
-    Alarm.alarmRepeat(7, 0, 0, LightsON);
-    Alarm.alarmRepeat(23, 0, 0, LightsOFF);
+    id_ = Alarm.alarmRepeat(7, 0, 0, LightsON);
+    Serial.print(id_);
+    Serial.println(": Lights 16 hours, On");
+    id_ = Alarm.alarmRepeat(23, 0, 0, LightsOFF);
+    Serial.print(id_);
+    Serial.println(": Lights 16 hours, Off");
   }
 
   if (mode == 3)
   {
     // Lights bud 12 hours
-    Alarm.alarmRepeat(9, 0, 0, LightsON);
-    Alarm.alarmRepeat(21, 0, 0, LightsOFF);
+    id_ = Alarm.alarmRepeat(9, 0, 0, LightsON);
+    Serial.print(id_);
+    Serial.println(": Lights 12 hours, On");
+    id_ = Alarm.alarmRepeat(21, 0, 0, LightsOFF);
+    Serial.print(id_);
+    Serial.println(": Lights 12 hours, Off");
   }
 
   if (mode == 4)
   {
     // Lights
-    Alarm.alarmRepeat(11, 42, 0, LightsON);
-    Alarm.alarmRepeat(11, 43, 0, LightsOFF);
+    id_ = Alarm.alarmRepeat(11, 42, 0, LightsON);
+    Serial.print(id_);
+    Serial.println(": Lights, On");
+    id_ = Alarm.alarmRepeat(11, 43, 0, LightsOFF);
+    Serial.print(id_);
+    Serial.println(": Lights, Off");
   }
 
   if (mode == 5)
@@ -202,12 +223,16 @@ void setup()
     Serial.print(F(":"));
     Serial.println(startMinute);
 
-    Alarm.alarmRepeat(getRealDow(startDay), startHour, startMinute, 0, WaterOn);
-    Alarm.alarmRepeat(getRealDow(startDay), startHour, startMinute, duration, WaterOff);
+    id_ = Alarm.alarmRepeat(getRealDow(startDay), startHour, startMinute, 0, WaterOn);
+    Serial.print(id_);
+    Serial.println(": Water, On");
+    id_ = Alarm.alarmRepeat(getRealDow(startDay), startHour, startMinute, duration, WaterOff);
+    Serial.print(id_);
+    Serial.println(": Water, Off");
     calcTimes();
   }
 
-   printJSON("NextTrigger", DateMe(Alarm.getNextTrigger()));
+  printJSON("NextTrigger", DateMe(Alarm.getNextTrigger()));
 }
 
 void loop()
@@ -298,18 +323,31 @@ void readSerial()
       {
         // Alarm_NextTrigger3-;
         printJSON("NextTrigger", DateMe(Alarm.getNextTrigger()));
-        printJSON("TriggerCount", DateMe(Alarm.count()));
+        printJSON("TriggerCount", String(Alarm.count()));
       }
       if (String(message).startsWith("Alarm_DeleteTriggers"))
       {
         // Alarm_DeleteTriggers;
         Serial.println("Hi");
-          for(uint8_t id = 0; id < Alarm.count(); id++) {
-            Alarm.free(id);   // ensure all Alarms are cleared and available for allocation
-          }
+        for (uint8_t id = 0; id < Alarm.count(); id++)
+        {
+          Alarm.free(id); // ensure all Alarms are cleared and available for allocation
+        }
 
         // Alarm.free(Alarm.getTriggeredAlarmId());
         // Serial.println("Alarm deleted: " + DateMe(Alarm.getNextTrigger()) + " freeing " + Alarm.getTriggeredAlarmId());
+      }
+      if (String(message).startsWith("Memory"))
+      {
+        // Memory;
+        MEMORY_PRINT_START;
+        MEMORY_PRINT_HEAPSTART;
+        MEMORY_PRINT_HEAPEND;
+        MEMORY_PRINT_STACKSTART;
+        MEMORY_PRINT_END;
+        MEMORY_PRINT_HEAPSIZE;
+        FREERAM_PRINT;
+        STACKPAINT_PRINT;
       }
     }
   }
@@ -657,7 +695,8 @@ void setMyRTC(char temp_string[])
   printJSON(Rtc.GetDateTime(), "setMyRTCRTC", "");
 }
 
-String DateMe(time_t t_unix_date1) {
+String DateMe(time_t t_unix_date1)
+{
   String t = "";
   t = year(t_unix_date1);
   t = t + "/";
