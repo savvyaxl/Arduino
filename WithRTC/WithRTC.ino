@@ -288,6 +288,11 @@ void readSerial()
         // Alarm_NextTrigger3-;
         printJSON("NextTrigger", DateMe(Alarm.getNextTrigger()));
       }
+      if (String(message).startsWith("Alarm_Read" + indexNO + "-"))
+      {
+        // Alarm_Read3-;
+        printJSON("AlarmRead", DateMe(Alarm.read(0)));
+      }
     }
   }
 }
