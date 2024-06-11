@@ -271,7 +271,7 @@ void readSerial()
       }
       if (String(message).startsWith("Time_Set" + indexNO + "-"))
       {
-        // Time_Set3-2023,05,20,21,49,30;
+        // Time_Set3-2024,06,10,21,52,00;
         String temp = String(message);
         temp.remove(0, 10);
         char buf[20];
