@@ -69,7 +69,7 @@ c:on("overflow", function(client, topic, data)
     print(topic .. " partial overflowed message: " .. data )
 end)
 
--- publish the state or config data
+-- publish the state, data comes from UART
 local publish_state = function (data)
     local p = "CONFIG"
     data = trim2(data)
