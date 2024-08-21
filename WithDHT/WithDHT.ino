@@ -3,7 +3,7 @@
 #define DHTTYPE DHT11   // DHT 11
 
 #define DHTPINA 2     // Digital pin connected to the DHT sensor
-//#define DHTPINB 3     // Digital pin connected to the DHT sensor
+#define DHTPINB 3     // Digital pin connected to the DHT sensor
 //#define DHTPINC 4     // Digital pin connected to the DHT sensor
 
 #define SENSOR0 A0   // first sensor
@@ -11,32 +11,32 @@
 
 #ifdef DHTPINA
 DHT dhtA(DHTPINA, DHTTYPE);
-String tA_name = "Temp 3";
-String tA_json = "Temp3";
-String hA_name = "Humidity 3";
-String hA_json = "Humidity3";
+String tA_name = "Temp_1";
+String tA_json = tA_name;
+String hA_name = "Humidity_1";
+String hA_json = hA_name;
 #endif
 #ifdef DHTPINB
 DHT dhtB(DHTPINB, DHTTYPE);
-String tB_name = "Temp 4";
-String tB_json = "Temp4";
-String hB_name = "Humidity 4";
-String hB_json = "Humidity4";
+String tB_name = "Temp_2";
+String tB_json = tB_name;
+String hB_name = "Humidity_2";
+String hB_json = hB_name;
 #endif
 #ifdef DHTPINC
 DHT dhtC(DHTPINC, DHTTYPE);
 String tC_name = "Temp 5";
-String tC_json = "Temp5";
+String tC_json = tC_name;
 String hC_name = "Humidity 5";
-String hC_json = "Humidity5";
+String hC_json = hC_name;
 #endif
 #ifdef SENSOR0
-String sA_name = "Light_Outside";
-String sA_json = "LightOutside|float*50/1024|int";
+String sA_name = "Light_1";
+String sA_json = sA_name+"|float*50/1024|int";
 #endif
 #ifdef SENSOR1
-String sB_name = "Moisture_Outside";
-String sB_json = "Moisture_Outside";
+String sB_name = "Moisture_1";
+String sB_json = sB_name;
 #endif
 
 
@@ -57,7 +57,7 @@ void config(String str_){
 
   #ifdef SENSOR1
   delay(100);
-  Serial.println("CONFIGdevice_class:None,name:"+sB_name+",unit_of_measurement:Moisture,value_template:{{value_json."+sB_json+"}}");
+  Serial.println("CONFIGdevice_class:Moisture,name:"+sB_name+",unit_of_measurement:Moisture,value_template:{{value_json."+sB_json+"}}");
   #endif
 
   #ifdef DHTPINA
@@ -171,23 +171,23 @@ void loop()
 
   String str = String("{ ");
   #ifdef DHTPINA
-  str += String(  "\"TempOutside\" : ") + String(tA);
-  str += String(", \"HumidityOutside\" : ") + String(hA);
+  str += String(  "\""+tA_name+"\" : ") + String(tA);
+  str += String(", \""+hA_name+"\" : ") + String(hA);
   #endif
   #ifdef DHTPINB
-  str += String(", \"TempOutside\" : ") + String(tB);
-  str += String(", \"HumidityOutside\" : ") + String(hB);
+  str += String(", \""+tB_name+"\" : ") + String(tB);
+  str += String(", \""+hB_name+"\" : ") + String(hB);
   #endif
   #ifdef DHTPINC
-  str += String(", \"TempOutside\" : ") + String(tC);
-  str += String(", \"HumidityOutside\" : ") + String(hC);
+  str += String(", \""+tC_name+"\" : ") + String(tC);
+  str += String(", \""+hC_name+"\" : ") + String(hC);
   #endif
 
   #ifdef SENSOR0
-  str += String(", \"LightOutside\" : ") + String(readingA0);
+  str += String(", \""+sA_name+"\" : ") + String(readingA0);
   #endif
   #ifdef SENSOR1
-  str += String(", \"MoistureOutside\" : ") + String(readingA1);
+  str += String(", \""+sB_name+"\" : ") + String(readingA1);
   #endif
 
   str += String(" }");
