@@ -7,7 +7,7 @@
 //#define DHTPINC 4     // Digital pin connected to the DHT sensor
 
 #define SENSOR0 A0   // first sensor
-#define SENSOR1 A1   // first sensor
+#define SENSOR1 A1   // second sensor
 
 #ifdef DHTPINA
 DHT dhtA(DHTPINA, DHTTYPE);
@@ -25,9 +25,9 @@ String hB_json = hB_name;
 #endif
 #ifdef DHTPINC
 DHT dhtC(DHTPINC, DHTTYPE);
-String tC_name = "Temp 5";
+String tC_name = "Temp_5";
 String tC_json = tC_name;
-String hC_name = "Humidity 5";
+String hC_name = "Humidity_5";
 String hC_json = hC_name;
 #endif
 #ifdef SENSOR0
@@ -150,22 +150,46 @@ void loop()
 
   #ifdef DHTPINA
   hA = hA/averageCounterMax;
+  if (isnan(hA)){
+    hA = -1;
+  }
   tA = tA/averageCounterMax;
-  #endif
+  if (isnan(tA)){
+    tA = -1;
+  }
+#endif
   #ifdef DHTPINB
   hB = hB/averageCounterMax;
+  if (isnan(hB)){
+    hB = -1;
+  }
   tB = tB/averageCounterMax;
+  if (isnan(tB)){
+    tB = -1;
+  }
   #endif
   #ifdef DHTPINC
   hC = hC/averageCounterMax;
+  if (isnan(hC)){
+    hC = -1;
+  }
   tC = tC/averageCounterMax;
+  if (isnan(tC)){
+    tC = -1;
+  }
   #endif
 
   #ifdef SENSOR0
   readingA0 = readingA0/averageCounterMax;
+  if (isnan(readingA0)){
+    readingA0 = -1;
+  }
   #endif
   #ifdef SENSOR1
   readingA1 = readingA1/averageCounterMax;
+  if (isnan(readingA1)){
+    readingA1 = -1;
+  }
   #endif
 
 
