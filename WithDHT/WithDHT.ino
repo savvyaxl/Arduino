@@ -192,7 +192,7 @@ void loop()
   }
   #endif
 
-
+  
   String str = String("{ ");
   #ifdef DHTPINA
   str += String(  "\""+tA_name+"\" : ") + String(tA);

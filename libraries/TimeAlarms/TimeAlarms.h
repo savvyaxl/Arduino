@@ -7,9 +7,9 @@
 #include "TimeLib.h"
 
 #if defined(__AVR__)
-#define dtNBR_ALARMS 20 // max is 255
+#define dtNBR_ALARMS 50 // max is 255
 #else
-#define dtNBR_ALARMS 25 // assume non-AVR has more memory
+#define dtNBR_ALARMS 75 // assume non-AVR has more memory
 #endif
 
 #define USE_SPECIALIST_METHODS // define this for testing

@@ -3,11 +3,11 @@
 // mode 2 grow
 // mode 3 flower
 // mode 4 test
-int mode = 2;
+int mode = 3;
 
 // Water
-int timesPerWeek = 2;
-int duration = 50;
+int timesPerWeek = 3;
+int duration = 30;
 
 String indexNO = "3";
 int realStartDay = 2;            // Sunday is really 1, 2 is Monday
@@ -232,17 +232,17 @@ void readSerial()
       message[message_pos] = inByte;
       // Serial.println(inByte);
       message_pos++;
+      // Serial.println(message_pos);
     }
     // Full message received...
     else
     {
       // Add null character to string
       message[message_pos] = '\0';
+      // Serial.println(String(message));
 
       // Reset for the next message
       message_pos = 0;
-      // Print the message (or do other things)
-      //     Serial.println(message);
       // Lights_3_On
       if (String(message) == "Lights_" + indexNO + "_On")
       {
