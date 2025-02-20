@@ -148,7 +148,7 @@ void loop()
   }
 
 
-  #ifdef DHTPINA
+#ifdef DHTPINA
   hA = hA/averageCounterMax;
   if (isnan(hA)){
     hA = -1;
@@ -158,7 +158,7 @@ void loop()
     tA = -1;
   }
 #endif
-  #ifdef DHTPINB
+#ifdef DHTPINB
   hB = hB/averageCounterMax;
   if (isnan(hB)){
     hB = -1;
@@ -167,8 +167,8 @@ void loop()
   if (isnan(tB)){
     tB = -1;
   }
-  #endif
-  #ifdef DHTPINC
+#endif
+#ifdef DHTPINC
   hC = hC/averageCounterMax;
   if (isnan(hC)){
     hC = -1;
@@ -177,20 +177,20 @@ void loop()
   if (isnan(tC)){
     tC = -1;
   }
-  #endif
+#endif
 
-  #ifdef SENSOR0
+#ifdef SENSOR0
   readingA0 = readingA0/averageCounterMax;
   if (isnan(readingA0)){
     readingA0 = -1;
   }
-  #endif
-  #ifdef SENSOR1
+#endif
+#ifdef SENSOR1
   readingA1 = readingA1/averageCounterMax;
   if (isnan(readingA1)){
     readingA1 = -1;
   }
-  #endif
+#endif
 
   
   String str = String("{ ");
@@ -216,7 +216,8 @@ void loop()
 
   str += String(" }");
   Serial.println(str);
-
+  
+  index = index + 1;
   if ( index > index_max){
     index = 0;
     config("Restarting...");
