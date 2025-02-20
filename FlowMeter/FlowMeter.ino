@@ -15,7 +15,7 @@ const float FLOW_FACTOR = 6.6; // Example: 6.6 L/min per pulse
 float totalFlow = 0.0;
 int advertiseCount = 0;
 int advertiseCountMAX = 3600; //every hour
-float totalPressure = 0;
+float totalPressure = 0.0;
 int pressureCount = 0;
 
 void flow () { // Interrupt function
