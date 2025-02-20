@@ -42,9 +42,9 @@ String sB_json = sB_name;
 
 
 // take a reading every 5 seconds then average it over the minute
-int averageCounter = 0;
-int averageCounterMax = 20;
 int delay_ = 5000;
+int averageCounterMax = 20;
+int averageCounter = 0;
 int do_ = 0;
 
 
@@ -52,7 +52,7 @@ void config(String str_){
   Serial.println(str_);
   delay(20000);
   #ifdef SENSOR0
-  Serial.println("CONFIGdevice_class:illuminance,name:"+sA_name+",unit_of_measurement:°C,value_template:{{value_json."+sA_json+"}}");
+  Serial.println("CONFIGdevice_class:illuminance,name:"+sA_name+",unit_of_measurement:°C,value_template:{{value_json." + sA_json + "}}");
   #endif
 
   #ifdef SENSOR1
@@ -148,49 +148,49 @@ void loop()
   }
 
 
-#ifdef DHTPINA
-  hA = hA/averageCounterMax;
-  if (isnan(hA)){
-    hA = -1;
-  }
-  tA = tA/averageCounterMax;
-  if (isnan(tA)){
-    tA = -1;
-  }
-#endif
-#ifdef DHTPINB
-  hB = hB/averageCounterMax;
-  if (isnan(hB)){
-    hB = -1;
-  }
-  tB = tB/averageCounterMax;
-  if (isnan(tB)){
-    tB = -1;
-  }
-#endif
-#ifdef DHTPINC
-  hC = hC/averageCounterMax;
-  if (isnan(hC)){
-    hC = -1;
-  }
-  tC = tC/averageCounterMax;
-  if (isnan(tC)){
-    tC = -1;
-  }
-#endif
+  #ifdef DHTPINA
+    hA = hA/averageCounterMax;
+    if (isnan(hA)){
+      hA = -1;
+    }
+    tA = tA/averageCounterMax;
+    if (isnan(tA)){
+      tA = -1;
+    }
+  #endif
+  #ifdef DHTPINB
+    hB = hB/averageCounterMax;
+    if (isnan(hB)){
+      hB = -1;
+    }
+    tB = tB/averageCounterMax;
+    if (isnan(tB)){
+      tB = -1;
+    }
+  #endif
+  #ifdef DHTPINC
+    hC = hC/averageCounterMax;
+    if (isnan(hC)){
+      hC = -1;
+    }
+    tC = tC/averageCounterMax;
+    if (isnan(tC)){
+      tC = -1;
+    }
+  #endif
 
-#ifdef SENSOR0
-  readingA0 = readingA0/averageCounterMax;
-  if (isnan(readingA0)){
-    readingA0 = -1;
-  }
-#endif
-#ifdef SENSOR1
-  readingA1 = readingA1/averageCounterMax;
-  if (isnan(readingA1)){
-    readingA1 = -1;
-  }
-#endif
+  #ifdef SENSOR0
+    readingA0 = readingA0/averageCounterMax;
+    if (isnan(readingA0)){
+      readingA0 = -1;
+    }
+  #endif
+  #ifdef SENSOR1
+    readingA1 = readingA1/averageCounterMax;
+    if (isnan(readingA1)){
+      readingA1 = -1;
+    }
+  #endif
 
   
   String str = String("{ ");
