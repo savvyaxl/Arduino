@@ -3,10 +3,10 @@
 // mode 2 grow
 // mode 3 flower
 // mode 4 test
-int mode = 3;
+int mode = 2;
 
 // Water
-int timesPerWeek = 3;
+int timesPerWeek = 2;
 int duration = 30;
 
 String indexNO = "3";
