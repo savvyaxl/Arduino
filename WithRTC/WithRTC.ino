@@ -114,12 +114,12 @@ void setup()
     Rtc.SetIsRunning(true);
   }
 
-  RtcDateTime now = Rtc.GetDateTime();
+  RtcDateTime _time = Rtc.GetDateTime();
   bool Time_Error = false;
-  if (now < compiled)
+  if (_time < compiled)
   {
     Serial.println("RTC is older than compile time!  (Updating DateTime)");
-    if (now > errorDate)
+    if (_time > errorDate)
     {
       Serial.println("RTC is older than compile time! But it is 165/165/2165 37:165 (Update canceled)");
       Rtc.SetDateTime(compiled);
@@ -131,24 +131,37 @@ void setup()
       Rtc.SetDateTime(compiled); // should never execute
     }
   }
-  else if (now > compiled)
+  else if (_time > compiled)
   {
     Serial.println("RTC is newer than compile time. (this is expected)");
   }
-  else if (now == compiled)
+  else if (_time == compiled)
   {
     Serial.println("RTC is the same as compile time! (not expected but all is fine)");
   }
 
   if (Time_Error)
   {
-    setTime(compiled.Unix32Time());
+    // setTime(compiled.Unix32Time());
+    setTime(compiled.Hour(),compiled.Minute(),compiled.Second(),compiled.Day(),compiled.Month(),compiled.Year());
+    Serial.println(DateMe(compiled.Unix32Time()));
+    Serial.println(compiled.Hour());
+    Serial.println(compiled.Minute());
+    Serial.println(compiled.Second());
+    Serial.println(compiled.Day());
+    Serial.println(compiled.Month());
+    Serial.println(compiled.Year());
+    printJSON(getRTCDateTime(now()),"now","");
+    // printJSON(now(),"now2","");
+    printJSON(_time,"_time","");
     printJSON(compiled, "compiled", "");
+// printDateTime(compiled,"label");
+
   }
   else
   {
-    setTime(now.Unix32Time());
-    printJSON(now, "RTC", "");
+    setTime(_time.Unix32Time());
+    printJSON(_time, "RTC", "");
   }
 
   // Time update
@@ -204,7 +217,8 @@ void setup()
     calcTimes();
   }
 
-  printJSON("NextTrigger", DateMe(Alarm.getNextTrigger()));
+  printJSON(getRTCDateTime(now()),"getTime","");
+  printJSON(getRTCDateTime(Alarm.getNextTrigger()),"NextTrigger","");
 }
 
 void loop()
@@ -386,8 +400,8 @@ void WaterReturnOff()
 
 void ReadRTC()
 {
-  RtcDateTime now = Rtc.GetDateTime();
-  if (!now.IsValid())
+  RtcDateTime _time = Rtc.GetDateTime();
+  if (!_time.IsValid())
   {
     // Common Causes:
     //    1) the battery on the device is low or even missing and the power line was disconnected
@@ -395,10 +409,10 @@ void ReadRTC()
   }
   else
   {
-    setTime(now.Unix32Time());
+    setTime(_time.Unix32Time());
   }
-  //  printDateTime(now, "Time after Update: ");
-  printJSON(now, "TimeUpdate", "");
+  //  printDateTime(_time, "Time after Update: ");
+  printJSON(_time, "TimeUpdate", "");
 }
 
 #define countof(a) (sizeof(a) / sizeof(a[0]))
@@ -649,4 +663,9 @@ String DateMe(time_t t_unix_date1)
   t = t + second(t_unix_date1);
 
   return t;
+}
+
+RtcDateTime getRTCDateTime(uint32_t t_unix_date1)
+{
+  return RtcDateTime(year(t_unix_date1), month(t_unix_date1), day(t_unix_date1), hour(t_unix_date1), minute(t_unix_date1), second(t_unix_date1));
 }

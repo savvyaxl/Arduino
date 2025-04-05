@@ -52,31 +52,31 @@ void config(String str_){
   Serial.println(str_);
   delay(20000);
   #ifdef SENSOR0
-  Serial.println("CONFIGdevice_class:illuminance,name:"+sA_name+",unit_of_measurement:°C,value_template:{{value_json." + sA_json + "}}");
+  Serial.println("CONFIGdevice_class:temperature,name:"+sA_name+",unit_of_measurement:°C,value_template:{{value_json." + sA_json + "}}");
   #endif
 
   #ifdef SENSOR1
   delay(100);
-  Serial.println("CONFIGdevice_class:Moisture,name:"+sB_name+",unit_of_measurement:Moisture,value_template:{{value_json."+sB_json+"}}");
+  Serial.println("CONFIGdevice_class:moisture,name:"+sB_name+",unit_of_measurement:%,value_template:{{value_json."+sB_json+"}}");
   #endif
 
   #ifdef DHTPINA
   delay(100);
   Serial.println("CONFIGdevice_class:temperature,name:"+tA_name+",unit_of_measurement:°C,value_template:{{value_json."+tA_json+"}}");
   delay(100);
-  Serial.println("CONFIGdevice_class:humidity,name:"+hA_name+",unit_of_measurement:°C,value_template:{{value_json."+hA_json+"}}");
+  Serial.println("CONFIGdevice_class:humidity,name:"+hA_name+",unit_of_measurement:%,value_template:{{value_json."+hA_json+"}}");
   #endif
   #ifdef DHTPINB
   delay(100);
   Serial.println("CONFIGdevice_class:temperature,name:"+tB_name+",unit_of_measurement:°C,value_template:{{value_json."+tB_json+"}}");
   delay(100);
-  Serial.println("CONFIGdevice_class:humidity,name:"+hB_name+",unit_of_measurement:°C,value_template:{{value_json."+hB_json+"}}");
+  Serial.println("CONFIGdevice_class:humidity,name:"+hB_name+",unit_of_measurement:%,value_template:{{value_json."+hB_json+"}}");
   #endif
   #ifdef DHTPINC
   delay(100);
   Serial.println("CONFIGdevice_class:temperature,name:"+tC_name+",unit_of_measurement:°C,value_template:{{value_json."+tC_json+"}}");
   delay(100);
-  Serial.println("CONFIGdevice_class:humidity,name:"+hC_name+",unit_of_measurement:°C,value_template:{{value_json."+hC_json+"}}");
+  Serial.println("CONFIGdevice_class:humidity,name:"+hC_name+",unit_of_measurement:%,value_template:{{value_json."+hC_json+"}}");
   #endif
 }
 
