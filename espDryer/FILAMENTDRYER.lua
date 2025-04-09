@@ -1,5 +1,5 @@
 -- FILAMENTDRYER
--- dht,file,gpio,mqtt,net,node,tmr,uart,wifi
+-- ada,dht,file,gpio,mqtt,net,node,tmr,uart,wifi
 UART_ON = false
 DALLAS_TEMP_ON = false
 --GPIO Switch - Relay
@@ -18,6 +18,7 @@ if BUTTON_ON then
     gpio.mode(pin2, gpio.INPUT,gpio.PULLUP)
 end
 -- DHT
+max_temp = 60
 DHT_ON = true
 if DHT_ON then
     pinDHT=2
@@ -66,28 +67,17 @@ end)
 
 c:on("message", function(conn,topic,data)
     if data~=nil then
-        print(data)
-        local p = "TEST"
+        local p = "TEMP"
         data = trim2(data)
         local t = (data:sub(0, #p) == p) and data:sub(#p+1) or nil
-        if t~=nil then
-            c:publish(mqtt_client_cfg.topic_test, topic .. ":'" .. t .. "'", 0, 0 )
-            uart.write( 0, t ) -- this goes back to the arduino
+        if t~=nil and type(t) == "number" then
+            max_temp = t
         end
-        p = "SWITCH"
+        p = "PID"
         data = trim2(data)
         local t = (data:sub(0, #p) == p) and data:sub(#p+1) or nil
-        if t~=nil then
-            if t == "On" then
-                c:publish(mqtt_client_cfg.topic_state, "{ \"Lights_4\":\"On\" }", 0, 0 )
-                gpio.write(pin1, ON_)
-                pin1OnOff=1
-            end
-            if t == "Off" then
-                c:publish(mqtt_client_cfg.topic_state, "{ \"Lights_4\":\"Off\" }", 0, 0 )
-                gpio.write(pin1, OFF_)
-                pin1OnOff=0
-            end
+        if t~=nil and type(t) == "number" then
+            max_temp = t
         end
     end
 end)
@@ -217,11 +207,12 @@ function configure()
 
 end
 
+
 function read_dht()
     status, temp, humi, temp_dec, humi_dec = dht.read11(pinDHT)
     if status == dht.OK then
         -- Float firmware just rounds down
-        if temp < 60 then
+        if temp < max_temp then
             gpio.write(pin1, ON_)
             pin1OnOff = 1
         else

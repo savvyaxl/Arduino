@@ -1,4 +1,11 @@
-DALLAS_TEMP_ON = true
+DHT_ON = true
+
+DHTPin=1
+if DHT_ON then
+    gpio.mode(DHTPin, gpio.INPUT)
+end
+
+
 
 -- MQTTPASS
 local myID = wifi.sta.getmac()
@@ -20,7 +27,7 @@ print(mqtt_client_cfg.topic_state)
 
 -- mqtt.Client(clientid, keepalive[, username, password, cleansession, max_message_length])
 c=mqtt.Client(mqtt_client_cfg.clientid,mqtt_client_cfg.keepalive,mqtt_client_cfg.user,mqtt_client_cfg.pass)
-c:lwt("/lwt", "offline "..mqtt_client_cfg.clientid, 0, 0)
+c:lwt("/lwt", "offline"..myID, 0, 0)
 is_connected = 0
 --callback on connect and disconnects
 c:on("connect", function(conn) 
@@ -36,6 +43,9 @@ c:on("offline", function(conn)
     is_connected = 0
     conn:close()
     publish("restarting")
+end)
+
+c:on("message", function(conn,topic,data)
 end)
 
 -- on publish overflow receive event
@@ -83,10 +93,10 @@ local publish = function (data)
             end
         ) 
     else
-        -- print("connected")
         publish_state (data) 
     end
 end
+
 
 c:connect(mqtt_client_cfg.host,mqtt_client_cfg.port,false,
     function(conn)
@@ -99,26 +109,37 @@ c:connect(mqtt_client_cfg.host,mqtt_client_cfg.port,false,
         print("failed reason: " .. reason)
 end)
 
--- ################################################################
-
-function configureTemp()
-    publish ("CONFIGdevice_class:temperature,name:Temp_Boil4,unit_of_measurement:°C,value_template:{{value_json.tBoil4 | round(1)}}")
+-- new
+function configure()
+    -- "CONFIGdevice_class:temperature,name:Temp_C,unit_of_measurement:°C,value_template:{{value_json.tC}}"
+    publish ("CONFIGdevice_class:temperature,name:Temp_Rack,unit_of_measurement:°C,value_template:{{value_json.tRack}}")
+    tmr.create():alarm(500, tmr.ALARM_SINGLE, function() 
+        publish ("CONFIGdevice_class:humidity,name:Humidity_Rack,unit_of_measurement:%,value_template:{{value_json.hRack}}")
+    end)
 end
 
-function publish_Temp( _temp )
-    publish ("{ \"tBoil4\" : ".._temp.." }")
+function read_dht()
+    status, temp, humi, temp_dec, humi_dec = dht.read11(D1)
+    if status == dht.OK then
+        -- Float firmware just rounds down
+        publish ("{\"tRack\" : "..temp..", \"hRack\" : "..humi.."}")
+
+    elseif status == dht.ERROR_CHECKSUM then
+        print( "DHT Checksum error." )
+    elseif status == dht.ERROR_TIMEOUT then
+        print( "DHT timed out." )
+    end
 end
 
-if DALLAS_TEMP_ON then
-    t = require('ds18b20')
-    t.setup(1) -- pin number
+if MONITOR_DHT_ON then
+    --configure()
     local tObj1 = tmr.create()
-    tObj1:alarm(600000,tmr.ALARM_AUTO,function()
-        configureTemp()
+    tObj1:alarm(2000, tmr.ALARM_AUTO,function() 
+        if is_connected then
+            tObj1:unregister()
+            configure()
+        end
     end)
     local tObj2 = tmr.create()
-    tObj2:alarm(10000,tmr.ALARM_AUTO,function()
-        local temp = t.readTemp()
-        publish_Temp( temp )
-    end)
+    tObj2:alarm(30000,tmr.ALARM_AUTO,function() read_dht() end)
 end
