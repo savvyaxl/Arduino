@@ -4,10 +4,11 @@
 -- DHT
 MAX_TEMP = 60
 HEATER_PID = 5000
+HEATER_PID_ONOFF = 0
 DHT_ON = true
 if DHT_ON then
-    PIN_RELAY=1
-    PIN_DHT=2
+    PIN_RELAY = 1
+    PIN_DHT = 2
     gpio.mode(PIN_DHT, gpio.INPUT)
 end
 
@@ -141,21 +142,21 @@ function read_dht()
     if status == dht.OK then
         -- Float firmware just rounds down
         if temp < MAX_TEMP then
-            gpio.write(pin1, ON_)
-            pin1OnOff = 1
+            gpio.write(PIN_RELAY, ON_)
+            HEATER_PID_ONOFF = 1
             local tObj1 = tmr.create()
             tObj1:alarm(HEATER_PID, tmr.ALARM_AUTO,function() 
                 if is_connected then
                     tObj1:unregister()
-                    gpio.write(pin1, OFF_)
-                    pin1OnOff = 0
+                    gpio.write(PIN_RELAY, OFF_)
+                    HEATER_PID_ONOFF = 0
                 end
             end)
         else
             gpio.write(pin1, OFF_)
-            pin1OnOff = 0
+            HEATER_PID_ONOFF = 0
         end
-        publish ("{\"tDryer\" : "..temp..", \"hDryer\" : "..humi.. ", \"Pin\" : "..pin1OnOff.."}")
+        publish ("{\"tDryer\" : "..temp..", \"hDryer\" : "..humi.. ", \"Pin\" : "..HEATER_PID_ONOFF.."}")
     elseif status == dht.ERROR_CHECKSUM then
         print( "DHT Checksum error." )
     elseif status == dht.ERROR_TIMEOUT then
