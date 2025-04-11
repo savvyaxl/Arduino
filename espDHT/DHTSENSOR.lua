@@ -112,17 +112,17 @@ end)
 -- new
 function configure()
     -- "CONFIGdevice_class:temperature,name:Temp_C,unit_of_measurement:°C,value_template:{{value_json.tC}}"
-    publish ("CONFIGdevice_class:temperature,name:Temp_Rack,unit_of_measurement:°C,value_template:{{value_json.tRack}}")
+    publish ("CONFIGdevice_class:temperature,name:Temp_Rack,unit_of_measurement:°C,value_template:{{value_json.tRack | round(1)}}")
     tmr.create():alarm(500, tmr.ALARM_SINGLE, function() 
         publish ("CONFIGdevice_class:humidity,name:Humidity_Rack,unit_of_measurement:%,value_template:{{value_json.hRack}}")
     end)
 end
 
 function read_dht()
-    status, temp, humi, temp_dec, humi_dec = dht.read11(D1)
+    status, temp, humi, temp_dec, humi_dec = dht.read11(DHTPin)
     if status == dht.OK then
-        -- Float firmware just rounds down
-        publish ("{\"tRack\" : "..temp..", \"hRack\" : "..humi.."}")
+        -- Integer firmware
+        publish ("{\"tRack\" : "..temp.."."..temp_dec..", \"hRack\" : "..humi.."}")
 
     elseif status == dht.ERROR_CHECKSUM then
         print( "DHT Checksum error." )
@@ -131,7 +131,7 @@ function read_dht()
     end
 end
 
-if MONITOR_DHT_ON then
+if DHT_ON then
     --configure()
     local tObj1 = tmr.create()
     tObj1:alarm(2000, tmr.ALARM_AUTO,function() 
