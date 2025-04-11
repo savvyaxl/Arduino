@@ -1,32 +1,14 @@
 -- FILAMENTDRYER
--- ada,dht,file,gpio,mqtt,net,node,tmr,uart,wifi
-UART_ON = false
-DALLAS_TEMP_ON = false
---GPIO Switch - Relay
-pin1=1
-pin1OnOff=0
-ON_=gpio.LOW
-OFF_=gpio.HIGH
-gpio.mode(pin1, gpio.OUTPUT)
-gpio.write(pin1, OFF_)
+-- ada,dht,file,gpio,mqtt,net,node,tmr,uart,wifi - integer
 
--- either button or DHT
--- Button
-BUTTON_ON = false
-if BUTTON_ON then
-    pin2=2
-    gpio.mode(pin2, gpio.INPUT,gpio.PULLUP)
-end
 -- DHT
-max_temp = 60
+MAX_TEMP = 60
+HEATER_PID = 5000
 DHT_ON = true
 if DHT_ON then
-    pinDHT=2
-    gpio.mode(pinDHT, gpio.INPUT)
-end
-
-if UART_ON then
-    uart.setup(0, 115200, 8, uart.PARITY_NONE, uart.STOPBITS_1, 1)
+    PIN_RELAY=1
+    PIN_DHT=2
+    gpio.mode(PIN_DHT, gpio.INPUT)
 end
 
 local myID = wifi.sta.getmac()
@@ -53,38 +35,39 @@ is_connected = "?"
 c:on("connect", function(conn) 
     print("online")
     conn:subscribe(mqtt_client_cfg.topic_subscribe,0,
-            function(conn) print("subscribe success") end)
-    is_connected = "true"
+        function(conn) print("subscribe success") 
+    end)
+    is_connected = 1
 end)
 c:on("connfail", function(client, reason) 
     print ("connection failed", reason) 
 end)
 c:on("offline", function(conn) 
-    is_connected = "false"
+    is_connected = 0
     conn:close()
     publish("restarting")
 end)
 
+c:on("overflow", function(client, topic, data)
+    print(topic .. " partial overflowed message: " .. data )
+end)
+
+-- Start of Code
 c:on("message", function(conn,topic,data)
     if data~=nil then
         local p = "TEMP"
         data = trim2(data)
         local t = (data:sub(0, #p) == p) and data:sub(#p+1) or nil
         if t~=nil and type(t) == "number" then
-            max_temp = t
+            MAX_TEMP = t
         end
         p = "PID"
         data = trim2(data)
         local t = (data:sub(0, #p) == p) and data:sub(#p+1) or nil
         if t~=nil and type(t) == "number" then
-            max_temp = t
+            HEATER_PID = t * 1000
         end
     end
-end)
-
--- on publish overflow receive event
-c:on("overflow", function(client, topic, data)
-    print(topic .. " partial overflowed message: " .. data )
 end)
 
 local publish_state = function (data)
@@ -113,11 +96,12 @@ local publish_state = function (data)
 end
 
 local publish = function (data)
-    if is_connected == "false" then
+    if is_connected == 0 then
         c:connect(mqtt_client_cfg.host,mqtt_client_cfg.port,false,
             function(conn) 
                 print("reconnected") 
                 publish_state (data) 
+                is_connected == 1
             end,
             function(conn, reason)
                 print("failed reason: " .. reason) 
@@ -132,67 +116,12 @@ c:connect(mqtt_client_cfg.host,mqtt_client_cfg.port,false,
     function(conn)
         print("connected")
         conn:subscribe(mqtt_client_cfg.topic_subscribe,0,
-            function(conn) print("subscribe success") end)      
-        end,
+            function(conn) print("subscribe success") 
+        end)      
+    end,
     function(conn, reason)
         print("failed reason: " .. reason)
 end)
-
--- ################################################################
-
-if UART_ON then
-    print("UART_ON")
-    uart.on("data", "\r",
-    function(data)
-        publish (data)
-    end, 0)
-end
-
--- ################################################################
-
-if BUTTON_ON then
-    function monitor(pin)
-        if gpio.read(pin2) == ON_ then
-            if pin1OnOff == 0 then
-                gpio.write(pin1, ON_)
-                c:publish(mqtt_client_cfg.topic_state, "{ \"Lights_4\":\"On\" }", 0, 0 )
-                --print("on - on")
-                pin1OnOff = 1
-            else
-                gpio.write(pin1, OFF_)
-                c:publish(mqtt_client_cfg.topic_state, "{ \"Lights_4\":\"Off\" }", 0, 0 )
-                --print("off - off")
-                pin1OnOff = 0
-            end
-        end
-    end
-    local tObj2 = tmr.create()
-    tObj2:alarm(500,tmr.ALARM_AUTO,function() monitor(pin2) end)
-end
-
--- ################################################################
-
-function configureTemp()
-    publish ("CONFIGdevice_class:temperature,name:temp_Dryer,unit_of_measurement:°C,value_template:{{value_json.tDryer | round(1)}}")
-end
-
-function publish_Temp( _temp )
-    publish ("{ \"tDryer\" : ".._temp.." }")
-end
-
-if DALLAS_TEMP_ON then
-    t = require('ds18b20')
-    t.setup(1) -- pin number
-    local tObj1 = tmr.create()
-    tObj1:alarm(600000,tmr.ALARM_AUTO,function()
-        configureTemp()
-    end)
-    local tObj2 = tmr.create()
-    tObj2:alarm(10000,tmr.ALARM_AUTO,function()
-        local temp = t.readTemp()
-        publish_Temp( temp )
-    end)
-end
 
 -- ################################################################
 
@@ -204,17 +133,24 @@ function configure()
     tmr.create():alarm(500, tmr.ALARM_SINGLE, function() 
         publish ("CONFIGdevice_class:temperature,name:Pin_Dryer,unit_of_measurement:°C,value_template:{{value_json.Pin | round(1)}}")
     end)
-
 end
 
 
 function read_dht()
-    status, temp, humi, temp_dec, humi_dec = dht.read11(pinDHT)
+    status, temp, humi, temp_dec, humi_dec = dht.read11(PIN_DHT)
     if status == dht.OK then
         -- Float firmware just rounds down
-        if temp < max_temp then
+        if temp < MAX_TEMP then
             gpio.write(pin1, ON_)
             pin1OnOff = 1
+            local tObj1 = tmr.create()
+            tObj1:alarm(HEATER_PID, tmr.ALARM_AUTO,function() 
+                if is_connected then
+                    tObj1:unregister()
+                    gpio.write(pin1, OFF_)
+                    pin1OnOff = 0
+                end
+            end)
         else
             gpio.write(pin1, OFF_)
             pin1OnOff = 0
