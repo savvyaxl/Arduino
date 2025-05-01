@@ -29,7 +29,7 @@ print(mqtt_client_cfg.topic_subscribe)
 print(mqtt_client_cfg.topic_state)
 
 c=mqtt.Client(mqtt_client_cfg.clientid,mqtt_client_cfg.keepalive)
-c:lwt("/lwt", "offline", 0, 0)
+c:lwt("/lwt", "offline "..mqtt_client_cfg.clientid, 0, 0)
 is_connected = "?"
 --callback on connect and disconnects
 c:on("connect", function(conn) 

@@ -28,7 +28,7 @@ print(mqtt_client_cfg.topic_state)
 
 -- mqtt.Client(clientid, keepalive[, username, password, cleansession, max_message_length])
 c=mqtt.Client(mqtt_client_cfg.clientid,mqtt_client_cfg.keepalive,mqtt_client_cfg.user,mqtt_client_cfg.pass)
-c:lwt("/lwt", "offline "..myID, 0, 0)
+c:lwt("/lwt", "offline "..mqtt_client_cfg.clientid, 0, 0)
 is_connected = 0
 
 --callback on connect and disconnects

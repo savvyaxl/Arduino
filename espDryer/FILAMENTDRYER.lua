@@ -1,15 +1,19 @@
 -- FILAMENTDRYER
 -- ada,dht,file,gpio,mqtt,net,node,tmr,uart,wifi - integer
 
+DEBUG = 0
 -- DHT
 MAX_TEMP = 60
 HEATER_PID = 5000
 HEATER_ONOFF = 0
+ON_=gpio.LOW
+OFF_=gpio.HIGH
 DHT_ON = true
 if DHT_ON then
     PIN_RELAY = 1
     PIN_DHT = 2
     gpio.mode(PIN_DHT, gpio.INPUT)
+    gpio.write(PIN_RELAY, OFF_)
 end
 
 local myID = wifi.sta.getmac()
@@ -29,8 +33,10 @@ mqtt_client_cfg.topic_test          = 'homeassistant/sensor/'..mqtt_client_cfg.c
 print(mqtt_client_cfg.topic_subscribe)
 print(mqtt_client_cfg.topic_state)
 
+-- PID3
+
 c=mqtt.Client(mqtt_client_cfg.clientid,mqtt_client_cfg.keepalive)
-c:lwt("/lwt", "offline"..myID, 0, 0)
+c:lwt("/lwt", "offline "..mqtt_client_cfg.clientid, 0, 0)
 is_connected = "?"
 --callback on connect and disconnects
 c:on("connect", function(conn) 
@@ -56,17 +62,21 @@ end)
 -- Start of Code
 c:on("message", function(conn,topic,data)
     if data~=nil then
+        if DEBUG == 1 then print("data: " .. data ) end
         local p = "TEMP"
         data = trim2(data)
         local t = (data:sub(0, #p) == p) and data:sub(#p+1) or nil
         if t~=nil and type(t) == "number" then
+            if DEBUG == 1 then print("t: " .. t ) end
             MAX_TEMP = t
         end
         p = "PID"
-        data = trim2(data)
         local t = (data:sub(0, #p) == p) and data:sub(#p+1) or nil
-        if t~=nil and type(t) == "number" then
-            HEATER_PID = t * 1000
+        if DEBUG == 1 then print("t: " .. t ) end
+        if DEBUG == 1 then print("type t: " .. type(t) ) end
+        if t~=nil and type(tonumber(t)) == "number" then
+            HEATER_PID = tonumber(t) * 1000
+            if DEBUG == 1 then print("HEATER_PID: " .. HEATER_PID) end
         end
     end
 end)
@@ -102,7 +112,7 @@ local publish = function (data)
             function(conn) 
                 print("reconnected") 
                 publish_state (data) 
-                is_connected == 1
+                is_connected = 1
             end,
             function(conn, reason)
                 print("failed reason: " .. reason) 
@@ -136,25 +146,32 @@ function configure()
     end)
 end
 
-
+TEMP_REACHED = 0
 function read_dht()
     status, temp, humi, temp_dec, humi_dec = dht.read11(PIN_DHT)
+    if DEBUG == 1 then print("PID: " .. HEATER_PID) end
+    if DEBUG == 1 then print("TEMP_REACHED: " .. TEMP_REACHED) end
+    if DEBUG == 1 then print("MAX_TEMP: " .. MAX_TEMP) end 
+    if DEBUG == 1 then print("temp: " .. temp) end 
     if status == dht.OK then
         -- Float firmware just rounds down
         if temp < MAX_TEMP then
             gpio.write(PIN_RELAY, ON_)
             HEATER_ONOFF = 1
-            local tObj1 = tmr.create()
-            tObj1:alarm(HEATER_PID, tmr.ALARM_AUTO,function() 
-                if is_connected then
-                    tObj1:unregister()
-                    gpio.write(PIN_RELAY, OFF_)
-                    HEATER_ONOFF = 0
-                end
-            end)
+            if TEMP_REACHED == 1 then
+                local tObj1 = tmr.create()
+                tObj1:alarm(HEATER_PID, tmr.ALARM_AUTO,function() 
+                    if is_connected then
+                        tObj1:unregister()
+                        gpio.write(PIN_RELAY, OFF_)
+                        HEATER_ONOFF = 0
+                    end
+                end)
+            end
         else
-            gpio.write(pin1, OFF_)
+            gpio.write(PIN_RELAY, OFF_)
             HEATER_ONOFF = 0
+            TEMP_REACHED = 1
         end
         publish ("{\"tDryer\" : "..temp..", \"hDryer\" : "..humi.. ", \"Pin\" : "..HEATER_ONOFF.."}")
     elseif status == dht.ERROR_CHECKSUM then

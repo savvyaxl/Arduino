@@ -7,7 +7,7 @@ int mode = 2;
 
 // Water
 int timesPerWeek = 2;
-int duration = 30;
+int duration = 45;
 
 String indexNO = "3";
 int realStartDay = 2;            // Sunday is really 1, 2 is Monday
@@ -160,8 +160,20 @@ void setup()
   }
   else
   {
+    if ( _time.Unix32Time() == 2313941504 ) {
+      Serial.println("bad");
+      Rtc.SetDateTime(compiled);
+      _time = Rtc.GetDateTime();
+    }
     setTime(_time.Unix32Time());
-    printJSON(_time, "RTC", "");
+    printJSON(_time, "RTCsetTime", "");
+    // printJSON(now(),"getvvTime","f");
+    // printDateTime(_time,"good");
+    // printDateTime(compiled,"compiled");
+    // Serial.println(returnDateTime(compiled));
+    // printJSON(getRTCDateTime(now()),"NextTrigger","");
+
+    // Serial.println(now());
   }
 
   // Time update
@@ -435,6 +447,23 @@ void printDateTime(const RtcDateTime &dt, String lable)
   Serial.println(datestring);
 }
 
+String returnDateTime(const RtcDateTime &dt)
+{
+  char datestring[20];
+  String dow = getDOW(dt);
+  snprintf_P(datestring,
+             countof(datestring),
+             PSTR("%02u/%02u/%04u %02u:%02u:%02u"),
+             dt.Month(),
+             dt.Day(),
+             dt.Year(),
+             dt.Hour(),
+             dt.Minute(),
+             dt.Second());
+  String str = dow + " ";
+  return str + datestring;
+}
+
 String str;
 void printJSON(const RtcDateTime &dt, String lable, String state)
 {
@@ -665,7 +694,8 @@ String DateMe(time_t t_unix_date1)
   return t;
 }
 
-RtcDateTime getRTCDateTime(uint32_t t_unix_date1)
+// RtcDateTime getRTCDateTime(uint32_t t_unix_date1)
+RtcDateTime getRTCDateTime(time_t t_unix_date1)
 {
   return RtcDateTime(year(t_unix_date1), month(t_unix_date1), day(t_unix_date1), hour(t_unix_date1), minute(t_unix_date1), second(t_unix_date1));
 }
