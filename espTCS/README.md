@@ -1,3 +1,4 @@
+<pre>
 NodeMCU 3.0.0.0 built on nodemcu-build.com provided by frightanic.com
 	branch: release
 	commit: 64bbf006898109b936fcc09478cbae9d099885a8
@@ -8,3 +9,4 @@ NodeMCU 3.0.0.0 built on nodemcu-build.com provided by frightanic.com
 	LFS: 0x0 bytes total capacity
 	modules: adc,adxl345,bit,file,gpio,i2c,mqtt,net,node,pwm,tcs34725,tmr,uart,wifi
  build 2020-10-21 19:23 powered by Lua 5.1.4 on SDK 3.0.1-dev(fce080e)
+<pre>
