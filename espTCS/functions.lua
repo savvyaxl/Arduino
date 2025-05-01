@@ -9,6 +9,14 @@ function mysplit (inputstr, sep)
         return t
 end
 
+function quote_d (inputstr)
+    return "\"" .. inputstr .. "\""
+end
+
+function trim2(s)
+    return s:match "^%s*(.-)%s*$"
+ end
+ 
 function find_Body ( payload )
     if payload:find("Content%-Length:")==nil then return 0 end
     ContentLength = tonumber(string.match(payload, "%d+", payload:find("Content%-Length:")+16))
