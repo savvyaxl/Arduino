@@ -1,3 +1,5 @@
 .vscode
 credentials.lua
 build
+client.key
+tls.cert

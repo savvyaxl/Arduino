@@ -1,7 +1,7 @@
 // modes
-// mode 1 seed
-// mode 2 grow
-// mode 3 flower
+// mode 1: 18 hours
+// mode 2: 16 hours
+// mode 3: 12 hours
 // mode 4 test
 int mode = 2;
 
