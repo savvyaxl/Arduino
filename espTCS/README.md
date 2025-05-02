@@ -1,4 +1,6 @@
-<pre>NodeMCU 3.0.0.0 built on nodemcu-build.com provided by frightanic.com
+<pre>
+https://nodemcu-build.com/trigger-build.php
+NodeMCU 3.0.0.0 built on nodemcu-build.com provided by frightanic.com
 	branch: release
 	commit: 64bbf006898109b936fcc09478cbae9d099885a8
 	release: 3.0-master_20200910
