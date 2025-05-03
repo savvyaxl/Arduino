@@ -13,7 +13,7 @@ tObj:alarm(2000, tmr.ALARM_AUTO, function ()
     tObj:unregister()
     print("Config done, IP is " .. wifi.sta.getip())
     -- dofile("MQTT.lua")
-    require("MQTT")
+    require("MQTTSSL")
   end
 end)
  

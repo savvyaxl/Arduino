@@ -1,6 +1,13 @@
 --MQTT
 require("TCS34725")
 
+USE_SSL=false
+if USE_SSL then
+    dofile("tls.cert")
+    tls.cert.auth(true)
+    tls.cert.verify(true)
+end
+
 TCS_ON = true
 
 local myID = wifi.sta.getmac()
@@ -15,6 +22,11 @@ mqtt_client_cfg.user                = credentials['829D_Fibra'].MQTTUSER
 mqtt_client_cfg.pass                = credentials['829D_Fibra'].MQTTPASS
 mqtt_client_cfg.topic_state         = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/state'
 mqtt_client_cfg.topic_subscribe     = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/do'
+
+if USE_SSL then
+    mqtt_client_cfg.port = credentials['829D_Fibra'].MQTTPORTSSL
+end
+        
 
 c=mqtt.Client(mqtt_client_cfg.clientid,mqtt_client_cfg.keepalive,mqtt_client_cfg.user,mqtt_client_cfg.pass)
 c:lwt("/lwt", "offline "..mqtt_client_cfg.clientid, 0, 0)
@@ -32,7 +44,7 @@ end)
 c:on("offline", function(conn) 
     is_connected = 0
     conn:close()
-    publish("restarting")
+    -- publish("restarting")
 end)
 
 c:on("message", function(conn,topic,data)
@@ -71,8 +83,8 @@ local publish_state = function (data)
 end
 
 local publish = function (data)
-    if is_connected == 0 then
-        c:connect(mqtt_client_cfg.host,mqtt_client_cfg.port,false,
+    if is_connected == 10 then
+        c:connect(mqtt_client_cfg.host,mqtt_client_cfg.port,USE_SSL,
             function(conn) 
                 print("reconnected") 
                 publish_state (data) 
@@ -87,7 +99,7 @@ local publish = function (data)
     end
 end
 
-c:connect(mqtt_client_cfg.host,mqtt_client_cfg.port,false,
+c:connect(mqtt_client_cfg.host,mqtt_client_cfg.port,USE_SSL,
     function(conn)
         print("connected")
         is_connected = 1
