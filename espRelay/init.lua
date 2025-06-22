@@ -68,7 +68,7 @@ wifi.eventmon.register(wifi.eventmon.STA_DISCONNECTED, wifi_disconnect_event)
 print("Connecting to WiFi access point...")
 wifi.setmode(wifi.STATION)
 station_cfg={}
-station_cfg.ssid=SSID
-station_cfg.pwd=PASSWORD
+station_cfg.ssid=credentials['GREEN'].SSID
+station_cfg.pwd=credentials['GREEN'].PASSWORD
 station_cfg.save=true
 wifi.sta.config(station_cfg)

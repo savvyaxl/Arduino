@@ -14,13 +14,14 @@ uart.setup(0, 115200, 8, uart.PARITY_NONE, uart.STOPBITS_1, 1)
 local mqtt_client_cfg = {}
 mqtt_client_cfg.clientid            = myID        
 mqtt_client_cfg.keepalive           = 120             
-mqtt_client_cfg.host                = credentials['829D_Fibra'].MQTTHOST
-mqtt_client_cfg.port                = credentials['829D_Fibra'].MQTTPORT
-mqtt_client_cfg.user                = credentials['829D_Fibra'].MQTTUSER
-mqtt_client_cfg.pass                = credentials['829D_Fibra'].MQTTPASS
+mqtt_client_cfg.host                = credentials['GREEN'].MQTTHOST
+mqtt_client_cfg.port                = credentials['GREEN'].MQTTPORT
+mqtt_client_cfg.user                = credentials['GREEN'].MQTTUSER
+mqtt_client_cfg.pass                = credentials['GREEN'].MQTTPASS
 mqtt_client_cfg.topic_subscribe     = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/do'
 mqtt_client_cfg.topic_state         = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/state'
 mqtt_client_cfg.topic_test          = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/test'
+mqtt_client_cfg.topic_connect       = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/connect'
 
 print(mqtt_client_cfg.topic_subscribe)
 print(mqtt_client_cfg.topic_state)
@@ -28,7 +29,7 @@ print(mqtt_client_cfg.topic_state)
 
 -- mqtt.Client(clientid, keepalive[, username, password, cleansession, max_message_length])
 c=mqtt.Client(mqtt_client_cfg.clientid,mqtt_client_cfg.keepalive,mqtt_client_cfg.user,mqtt_client_cfg.pass)
-c:lwt("/lwt", "offline "..mqtt_client_cfg.clientid, 0, 0)
+c:lwt(mqtt_client_cfg.topic_connect, "Offline", 0, 0)
 is_connected = 0
 
 --callback on connect and disconnects
@@ -91,9 +92,16 @@ local publish_state = function (data)
         stringBulder = stringBulder .. quote_d ( 'state_topic' ) .. ":" .. quote_d ( mqtt_client_cfg.topic_state )
         stringBulder = stringBulder .. " }"
         c:publish('homeassistant/sensor/' .. mqtt_client_cfg.clientid..'/' .. name .. '/config', stringBulder, 0, 0 )
-    else
-	    c:publish(mqtt_client_cfg.topic_state, data, 0, 0 )
+        do return end
     end
+    p = "CONNECT"
+    data = trim2(data)
+    if data:sub(0, #p) == p then
+        local t = (data:sub(0, #p) == p) and data:sub(#p+1) or data
+        c:publish(mqtt_client_cfg.topic_connect, t, 0, 0 )
+        do return end
+    end
+    c:publish(mqtt_client_cfg.topic_state, data, 0, 0 )
 end
 
 -- mqtt:connect(host[, port[, secure]][, function(client)[, function(client, reason)]])
@@ -118,6 +126,7 @@ c:connect(mqtt_client_cfg.host,mqtt_client_cfg.port,false,
     function(conn)
         print("connected")
         is_connected = 1
+        publish ("CONNECTGood")
         conn:subscribe(mqtt_client_cfg.topic_subscribe,0,
             function(conn) print("subscribe success") end)      
         end,

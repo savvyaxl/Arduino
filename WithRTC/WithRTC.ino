@@ -6,7 +6,7 @@
 int mode = 2;
 
 // Water
-int timesPerWeek = 2;
+int timesPerWeek = 1;
 int duration = 45;
 
 String indexNO = "3";

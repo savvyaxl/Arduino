@@ -82,7 +82,7 @@ end
 print("Connecting to WiFi access point...")
 wifi.setmode(wifi.STATION)
 station_cfg={}
-station_cfg.ssid=credentials['829D_Fibra'].SSID
-station_cfg.pwd=credentials['829D_Fibra'].PASSWORD
+station_cfg.ssid=credentials['GREEN'].SSID
+station_cfg.pwd=credentials['GREEN'].PASSWORD
 station_cfg.save=true
 wifi.sta.config(station_cfg)
