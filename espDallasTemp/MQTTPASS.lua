@@ -3,14 +3,15 @@ DALLAS_TEMP_ON = true
 -- MQTTPASS
 local myID = wifi.sta.getmac()
 myID = myID:gsub(":", "")
+local def_sta_config=wifi.sta.getconfig(true)
 
 local mqtt_client_cfg = {}
 mqtt_client_cfg.clientid            = myID        
 mqtt_client_cfg.keepalive           = 120             
-mqtt_client_cfg.host                = credentials['829D_Fibra'].MQTTHOST
-mqtt_client_cfg.port                = credentials['829D_Fibra'].MQTTPORT
-mqtt_client_cfg.user                = credentials['829D_Fibra'].MQTTUSER
-mqtt_client_cfg.pass                = credentials['829D_Fibra'].MQTTPASS
+mqtt_client_cfg.host                = credentials[def_sta_config.ssid].MQTTHOST
+mqtt_client_cfg.port                = credentials[def_sta_config.ssid].MQTTPORT
+mqtt_client_cfg.user                = credentials[def_sta_config.ssid].MQTTUSER
+mqtt_client_cfg.pass                = credentials[def_sta_config.ssid].MQTTPASS
 mqtt_client_cfg.topic_subscribe     = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/do'
 mqtt_client_cfg.topic_state         = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/state'
 mqtt_client_cfg.topic_test          = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/test'
@@ -101,7 +102,7 @@ end)
 
 -- ################################################################
 
-function configureTemp()
+function configure()
     publish ("CONFIGdevice_class:temperature,name:Temp_Boil4,unit_of_measurement:°C,value_template:{{value_json.tBoil4 | round(1)}}")
 end
 
@@ -113,8 +114,11 @@ if DALLAS_TEMP_ON then
     t = require('ds18b20')
     t.setup(1) -- pin number
     local tObj1 = tmr.create()
-    tObj1:alarm(600000,tmr.ALARM_AUTO,function()
-        configureTemp()
+    tObj1:alarm(2000, tmr.ALARM_AUTO,function() 
+        if is_connected then
+            tObj1:unregister()
+            configure()
+        end
     end)
     local tObj2 = tmr.create()
     tObj2:alarm(10000,tmr.ALARM_AUTO,function()

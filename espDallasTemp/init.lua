@@ -1,10 +1,6 @@
 -- load credentials, 'SSID' and 'PASSWORD' declared and initialize in there
 dofile("credentials.lua")
 
-
-print(credentials['829D_Fibra'].MQTTHOST)
-
-
 function startup()
     if file.open("init.lua") == nil then
         print("init.lua deleted or renamed")
@@ -64,30 +60,33 @@ wifi_disconnect_event = function(T)
   end
 end
 
-function do_me ()
-  wifi.sta.getap(1, listap)
-end
--- do_me ()
-
-
 -- Register WiFi Station event callbacks
 wifi.eventmon.register(wifi.eventmon.STA_CONNECTED, wifi_connect_event)
 wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, wifi_got_ip_event)
 wifi.eventmon.register(wifi.eventmon.STA_DISCONNECTED, wifi_disconnect_event)
 
 function listap(t) -- (SSID : Authmode, RSSI, BSSID, Channel)
+  if type(t) ~= "table" then
+    print("Not A Table")
+    return
+  end
   print("\n\t\t\tSSID\t\t\t\t\tBSSID\t\t\t  RSSI\t\tAUTHMODE\t\tCHANNEL")
   for bssid,v in pairs(t) do
       local ssid, rssi, authmode, channel = string.match(v, "([^,]+),([^,]+),([^,]+),([^,]*)")
       print(string.format("%32s",ssid).."\t"..bssid.."\t  "..rssi.."\t\t"..authmode.."\t\t\t"..channel)
+      for mybssid,d in pairs(credentials) do
+        if mybssid == bssid then
+          mychannel = bssid
+          print(mychannel)
+          station_cfg={}
+          station_cfg.ssid=credentials[mychannel].SSID
+          station_cfg.pwd=credentials[mychannel].PASSWORD
+          station_cfg.save=true
+          wifi.sta.config(station_cfg)
+        end
+      end
   end
 end
 
-
-print("Connecting to WiFi access point...")
 wifi.setmode(wifi.STATION)
-station_cfg={}
-station_cfg.ssid=credentials['GREEN'].SSID
-station_cfg.pwd=credentials['GREEN'].PASSWORD
-station_cfg.save=true
-wifi.sta.config(station_cfg)
+wifi.sta.getap(listap)

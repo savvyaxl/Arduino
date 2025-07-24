@@ -12,19 +12,20 @@ TCS_ON = true
 
 local myID = wifi.sta.getmac()
 myID = myID:gsub(":", "")
+local def_sta_config=wifi.sta.getconfig(true)
 
 local mqtt_client_cfg = {}
 mqtt_client_cfg.clientid            = 'tcs_'..myID        
 mqtt_client_cfg.keepalive           = 120             
-mqtt_client_cfg.host                = credentials['829D_Fibra'].MQTTHOST
-mqtt_client_cfg.port                = credentials['829D_Fibra'].MQTTPORT
-mqtt_client_cfg.user                = credentials['829D_Fibra'].MQTTUSER
-mqtt_client_cfg.pass                = credentials['829D_Fibra'].MQTTPASS
+mqtt_client_cfg.host                = credentials[def_sta_config.ssid].MQTTHOST
+mqtt_client_cfg.port                = credentials[def_sta_config.ssid].MQTTPORT
+mqtt_client_cfg.user                = credentials[def_sta_config.ssid].MQTTUSER
+mqtt_client_cfg.pass                = credentials[def_sta_config.ssid].MQTTPASS
 mqtt_client_cfg.topic_state         = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/state'
 mqtt_client_cfg.topic_subscribe     = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/do'
 
 if USE_SSL then
-    mqtt_client_cfg.port = credentials['829D_Fibra'].MQTTPORTSSL
+    mqtt_client_cfg.port = credentials[def_sta_config.ssid].MQTTPORTSSL
 end
         
 
