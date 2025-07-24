@@ -8,17 +8,17 @@ end
 -- MQTTPASS
 local myID = wifi.sta.getmac()
 myID = myID:gsub(":", "")
-local def_sta_config=wifi.sta.getconfig(true)
+local sta_config=wifi.sta.getconfig(true)
 
 uart.setup(0, 115200, 8, uart.PARITY_NONE, uart.STOPBITS_1, 1)
 
 local mqtt_client_cfg = {}
 mqtt_client_cfg.clientid            = myID        
 mqtt_client_cfg.keepalive           = 120             
-mqtt_client_cfg.host                = credentials[def_sta_config.ssid].MQTTHOST
-mqtt_client_cfg.port                = credentials[def_sta_config.ssid].MQTTPORT
-mqtt_client_cfg.user                = credentials[def_sta_config.ssid].MQTTUSER
-mqtt_client_cfg.pass                = credentials[def_sta_config.ssid].MQTTPASS
+mqtt_client_cfg.host                = credentials[sta_config.ssid].MQTTHOST
+mqtt_client_cfg.port                = credentials[sta_config.ssid].MQTTPORT
+mqtt_client_cfg.user                = credentials[sta_config.ssid].MQTTUSER
+mqtt_client_cfg.pass                = credentials[sta_config.ssid].MQTTPASS
 mqtt_client_cfg.topic_subscribe     = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/do'
 mqtt_client_cfg.topic_state         = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/state'
 mqtt_client_cfg.topic_test          = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/test'

@@ -76,13 +76,13 @@ function listap(t) -- (SSID : Authmode, RSSI, BSSID, Channel)
       print(string.format("%32s",ssid).."\t"..bssid.."\t  "..rssi.."\t\t"..authmode.."\t\t\t"..channel)
       for mybssid,d in pairs(credentials) do
         if mybssid == bssid then
-          mychannel = bssid
           print(mychannel)
           station_cfg={}
-          station_cfg.ssid=credentials[mychannel].SSID
-          station_cfg.pwd=credentials[mychannel].PASSWORD
+          station_cfg.ssid=mybssid
+          station_cfg.pwd=credentials[mybssid].PASSWORD
           station_cfg.save=true
           wifi.sta.config(station_cfg)
+          return
         end
       end
   end
