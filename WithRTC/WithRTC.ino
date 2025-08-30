@@ -3,7 +3,7 @@
 // mode 2: 16 hours
 // mode 3: 12 hours
 // mode 4 test
-int mode = 2;
+int mode = 3;
 
 // Water
 int timesPerWeek = 1;
@@ -143,7 +143,7 @@ void setup()
   if (Time_Error)
   {
     // setTime(compiled.Unix32Time());
-    setTime(compiled.Hour(),compiled.Minute(),compiled.Second(),compiled.Day(),compiled.Month(),compiled.Year());
+    setTime(compiled.Hour(), compiled.Minute(), compiled.Second(), compiled.Day(), compiled.Month(), compiled.Year());
     Serial.println(DateMe(compiled.Unix32Time()));
     Serial.println(compiled.Hour());
     Serial.println(compiled.Minute());
@@ -151,16 +151,16 @@ void setup()
     Serial.println(compiled.Day());
     Serial.println(compiled.Month());
     Serial.println(compiled.Year());
-    printJSON(getRTCDateTime(now()),"now","");
+    printJSON(getRTCDateTime(now()), "now", "");
     // printJSON(now(),"now2","");
-    printJSON(_time,"_time","");
+    printJSON(_time, "_time", "");
     printJSON(compiled, "compiled", "");
-// printDateTime(compiled,"label");
-
+    // printDateTime(compiled,"label");
   }
   else
   {
-    if ( _time.Unix32Time() == 2313941504 ) {
+    if (_time.Unix32Time() == 2313941504)
+    {
       Serial.println("bad");
       Rtc.SetDateTime(compiled);
       _time = Rtc.GetDateTime();
@@ -229,8 +229,8 @@ void setup()
     calcTimes();
   }
 
-  printJSON(getRTCDateTime(now()),"getTime","");
-  printJSON(getRTCDateTime(Alarm.getNextTrigger()),"NextTrigger","");
+  printJSON(getRTCDateTime(now()), "getTime", "");
+  printJSON(getRTCDateTime(Alarm.getNextTrigger()), "NextTrigger", "");
 }
 
 void loop()
