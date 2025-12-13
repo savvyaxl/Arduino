@@ -1,3 +1,5 @@
+-- File espDallaTemp/MQTTPASS.lua
+
 DALLAS_TEMP_ON = true
 
 -- MQTTPASS
@@ -104,15 +106,23 @@ end)
 
 function configure()
     publish ("CONFIGdevice_class:temperature,name:Temp_Boil4,unit_of_measurement:°C,value_template:{{value_json.tBoil4 | round(1)}}")
+    print("Published Homeassistant Config")
 end
+
+
 
 function publish_Temp( _temp )
-    publish ("{ \"tBoil4\" : ".._temp.." }")
+    if _temp ~= nil then
+        publish ("{ \"tBoil4\" : ".._temp.." }")
+    else
+        print("Failed to read temperature.")
+    end
 end
 
+
 if DALLAS_TEMP_ON then
-    t = require('ds18b20')
-    t.setup(1) -- pin number
+    local ds18b20 = require('ds18b20')
+    ds18b20.setup(1) -- pin number
     local tObj1 = tmr.create()
     tObj1:alarm(2000, tmr.ALARM_AUTO,function() 
         if is_connected then
@@ -122,7 +132,8 @@ if DALLAS_TEMP_ON then
     end)
     local tObj2 = tmr.create()
     tObj2:alarm(10000,tmr.ALARM_AUTO,function()
-        local temp = t.readTemp()
+        local temp = ds18b20.readTemp()
+        print("time")
         publish_Temp( temp )
     end)
 end

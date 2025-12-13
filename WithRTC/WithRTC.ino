@@ -3,11 +3,11 @@
 // mode 2: 16 hours
 // mode 3: 12 hours
 // mode 4 test
-int mode = 3;
+int mode = 2;
 
 // Water
-int timesPerWeek = 1;
-int duration = 45;
+int timesPerWeek = 2;
+int duration = 30;
 
 String indexNO = "3";
 int realStartDay = 2;            // Sunday is really 1, 2 is Monday
