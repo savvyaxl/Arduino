@@ -1,5 +1,5 @@
 --MQTT
--- require("TCS34725")
+require("TCS34725")
 
 TCS_ON = true
 
