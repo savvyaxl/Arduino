@@ -16,16 +16,18 @@ if DHT_ON then
     gpio.write(PIN_RELAY, OFF_)
 end
 
+-- MQTTPASS
 local myID = wifi.sta.getmac()
 myID = myID:gsub(":", "")
+local def_sta_config=wifi.sta.getconfig(true)
 
 local mqtt_client_cfg = {}
 mqtt_client_cfg.clientid            = myID        
 mqtt_client_cfg.keepalive           = 120             
-mqtt_client_cfg.host                = credentials['GREEN'].MQTTHOST
-mqtt_client_cfg.port                = credentials['GREEN'].MQTTPORT
-mqtt_client_cfg.user                = credentials['GREEN'].MQTTUSER
-mqtt_client_cfg.pass                = credentials['GREEN'].MQTTPASS
+mqtt_client_cfg.host                = credentials[def_sta_config.ssid].MQTTHOST
+mqtt_client_cfg.port                = credentials[def_sta_config.ssid].MQTTPORT
+mqtt_client_cfg.user                = credentials[def_sta_config.ssid].MQTTUSER
+mqtt_client_cfg.pass                = credentials[def_sta_config.ssid].MQTTPASS
 mqtt_client_cfg.topic_subscribe     = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/do'
 mqtt_client_cfg.topic_state         = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/state'
 mqtt_client_cfg.topic_test          = 'homeassistant/sensor/'..mqtt_client_cfg.clientid..'/test'
@@ -35,7 +37,7 @@ print(mqtt_client_cfg.topic_state)
 
 -- PID3
 
-c=mqtt.Client(mqtt_client_cfg.clientid,mqtt_client_cfg.keepalive)
+c=mqtt.Client(mqtt_client_cfg.clientid,mqtt_client_cfg.keepalive,mqtt_client_cfg.user,mqtt_client_cfg.pass)
 c:lwt("/lwt", "offline "..mqtt_client_cfg.clientid, 0, 0)
 is_connected = "?"
 --callback on connect and disconnects
@@ -52,7 +54,7 @@ end)
 c:on("offline", function(conn) 
     is_connected = 0
     conn:close()
-    publish("restarting")
+    --publish("restarting")
 end)
 
 c:on("overflow", function(client, topic, data)
@@ -115,7 +117,7 @@ local publish = function (data)
                 is_connected = 1
             end,
             function(conn, reason)
-                print("failed reason: " .. reason) 
+                print("failed reason publish: " .. reason) 
             end
         ) 
     else
@@ -131,7 +133,7 @@ c:connect(mqtt_client_cfg.host,mqtt_client_cfg.port,false,
         end)      
     end,
     function(conn, reason)
-        print("failed reason: " .. reason)
+        print("failed reason connect: " .. reason)
 end)
 
 -- ################################################################
