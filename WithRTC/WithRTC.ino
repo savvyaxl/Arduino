@@ -3,10 +3,10 @@
 // mode 2: 16 hours
 // mode 3: 12 hours
 // mode 4 test
-int mode = 2;
+int mode = 3;
 
 // Water
-int timesPerWeek = 2;
+int timesPerWeek = 3;
 int duration = 30;
 
 String indexNO = "3";
