@@ -19,7 +19,11 @@ end
 -- MQTTPASS
 local myID = wifi.sta.getmac()
 myID = myID:gsub(":", "")
-local def_sta_config=wifi.sta.getconfig(true)
+local def_sta_config = wifi.sta.getconfig(true)
+if not def_sta_config or not def_sta_config.ssid or not credentials[def_sta_config.ssid] then
+    print("WiFi not configured or credentials missing. Please configure WiFi and credentials.")
+    return
+end
 
 local mqtt_client_cfg = {}
 mqtt_client_cfg.clientid            = myID        
