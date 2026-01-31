@@ -1,10 +1,6 @@
 UART_ON = true
 MONITOR_MESSAGE = true
 
-if UART_ON then
-    print("uart on")
-end
-
 -- MQTTPASS
 local myID = wifi.sta.getmac()
 myID = myID:gsub(":", "")
@@ -54,7 +50,7 @@ end)
 if MONITOR_MESSAGE then
     c:on("message", function(conn, topic, data)
         if data ~= nil then
-            print(data)
+            -- print(data)
             local p = "TEST"
             data = trim2(data)
             local t = (data:sub(0, #p) == p) and data:sub(#p + 1) or nil
@@ -110,6 +106,7 @@ local publish_state = function(data)
             return
         end
     end
+    -- print("Publishing " .. data .. " to " .. mqtt_client_cfg.topic_state)
     c:publish(mqtt_client_cfg.topic_state, data, 0, 1)
 end
 
@@ -133,7 +130,7 @@ c:connect(mqtt_client_cfg.host, mqtt_client_cfg.port, false, function(conn)
     is_connected = 1
     publish("CONNECTConnected to " .. sta_config.ssid)
     conn:subscribe(mqtt_client_cfg.topic_subscribe, 0, function(conn)
-        publish("CONNECTPublished to " .. mqtt_client_cfg.topic_subscribe)
+        publish("CONNECTSubscribed to " .. mqtt_client_cfg.topic_subscribe)
         print("subscribe success")
     end)
 end, function(conn, reason)
@@ -143,6 +140,7 @@ end)
 if UART_ON then
     print("UART_ON")
     uart.on("data", "\r", function(data)
+        --print("Publishing UART: " .. data)
         publish(data)
     end, 0)
 end

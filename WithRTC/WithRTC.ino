@@ -259,6 +259,7 @@ void readSerial()
       // Serial.println(inByte);
       message_pos++;
       // Serial.println(message_pos);
+      //Serial.println(String(message));
     }
     // Full message received...
     else
@@ -269,6 +270,9 @@ void readSerial()
 
       // Reset for the next message
       message_pos = 0;
+      // Serial.print("Message: ");
+      // Serial.println(String(message));
+
       // Lights_3_On
       if (String(message) == "Lights_" + indexNO + "_On")
       {
