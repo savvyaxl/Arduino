@@ -67,6 +67,46 @@ c:on("overflow", function(client, topic, data)
     print(topic .. " partial overflowed message: " .. data)
 end)
 
+
+-- homeassistant/binary_sensor/lights_4/config
+-- {
+--   "name": "Lights_4",
+--   "unique_id": "lights_4_sensor",
+--   "state_topic": "homeassistant/sensor/483fda75b4b7/state",
+--   "payload_on": "On",
+--   "payload_off": "Off",
+--   "value_template": "{{ value_json.Lights_4 }}",
+--   "device_class": "light",
+--   "device": {
+--     "identifiers": ["483fda75b4b7"],
+--     "manufacturer": "CustomMQTT",
+--     "model": "Light Controller v1",
+--     "name": "Light 4 Controller"
+--   }
+-- }
+-- homeassistant/switch/light_4_switch/config
+-- {
+--   "name": "Light 4 Switch",
+--   "unique_id": "light_4_switch",
+--   "state_topic": "homeassistant/sensor/483fda75b4b7/state",
+--   "command_topic": "homeassistant/sensor/483fda75b4b7/do",
+--   "payload_on": "SWITCHOn",
+--   "payload_off": "SWITCHOff",
+--   "state_on": "On",
+--   "state_off": "Off",
+--   "value_template": "{{ value_json.Lights_4 }}",
+--   "qos": 0,
+--   "retain": false,
+--   "device": {
+--     "identifiers": ["483fda75b4b7"],
+--     "manufacturer": "CustomMQTT",
+--     "model": "Light Controller v1",
+--     "name": "Light 4 Controller"
+--   }
+-- }
+
+
+
 -- publish the state, data comes from UART
 local publish_state = function(data)
     local p = "CONFIG"
