@@ -231,6 +231,7 @@ void setup()
 
   printJSON(getRTCDateTime(now()), "getTime", "");
   printJSON(getRTCDateTime(Alarm.getNextTrigger()), "NextTrigger", "");
+  config();
 }
 
 void loop()
@@ -238,6 +239,15 @@ void loop()
   readSerial();
   readSwitch();
   Alarm.delay(1000); // tick
+}
+
+void config() {
+  Serial.println("CONFIGdevice_class:water,name:TEST OR,unit_of_measurement:L,value_template:{{value_json.test}},payload_on:SWITCHwaterOn,payload_off:SWITCHwaterOff");
+  // delay(500);
+  // Serial.println("CONFIGdevice_class:water,name:TEST OR1,unit_of_measurement:L,value_template:{{value_json.test1}},payload_on:SWITCHwaterOn,payload_off:SWITCHwaterOff");
+  // -- "CONFIGdevice_class:light,name:Light 5 Sensor,unit_of_measurement:°C,value_template:{{value_json.light_5_sensor}}"
+  //   delay(100);
+  // Serial.println("CONFIGdevice_class:water,name:Water_Pressure_Main,unit_of_measurement:L,value_template:{{value_json.WaterPressureMain|float*50/1024|int}}");
 }
 
 void readSerial()
@@ -493,30 +503,6 @@ void printJSON(const RtcDateTime &dt, String lable, String state)
   Serial.println(str);
 }
 
-void printJSON(time_t time, String lable, String state)
-{
-  // char datestring[20];
-  // String dow = getDOW(dt);
-  // snprintf_P(datestring,
-  //         countof(datestring),
-  //         PSTR("%02u/%02u/%04u %02u:%02u:%02u"),
-  //         dt.Month(),
-  //         dt.Day(),
-  //         dt.Year(),
-  //         dt.Hour(),
-  //         dt.Minute(),
-  //         dt.Second() );
-
-  str = String("{ ");
-  str = str + String("\"") + String(lable) + String("_TIME") + String("\" : \"") + String(time) + String("\"");
-  if (state != "")
-  {
-    str = str + String(",\"") + String(lable) + String("\" : \"") + String(state) + String("\"");
-  }
-  str = str + String(" }");
-  Serial.println(str);
-}
-
 void printJSON(String lable, String state)
 {
   str = String("{ ");
@@ -589,25 +575,15 @@ String lieDow(int dow)
 
 void calcTimes()
 {
-
-  //  int timesPerWeek = 5;
-  //  int startHour    = 6;
-  //  int startMinute  = 4;
-  //  int duration     = 50;
   int hoursInWeek = 168;
   int days_ = (hoursInWeek / timesPerWeek) / 24;
-  // Serial.println(days_);
   startDay = startDay + days_;
-  // Serial.println(startDay);
   int hours_ = (hoursInWeek / timesPerWeek) - (days_ * 24);
-  // Serial.println(hours_);
   startHour = startHour + hours_;
-
   if (hoursInWeek > (hoursInWeek / timesPerWeek) * timesPerWeek)
   {
     float hours__ = float(hoursInWeek) / float(timesPerWeek);
     int minutes_ = (hours__ - int(hoursInWeek / timesPerWeek)) * 60;
-    // Serial.println(minutes_);
     startMinute = startMinute + minutes_ + 1; // somewhere in the float to int conversion I lose 1, it is 36 and not 35 for 5 times a week
     if (startMinute >= 60)
     {
