@@ -16,9 +16,15 @@ mqtt_client_cfg.port = credentials[sta_config.ssid].MQTTPORT
 mqtt_client_cfg.user = credentials[sta_config.ssid].MQTTUSER
 mqtt_client_cfg.pass = credentials[sta_config.ssid].MQTTPASS
 mqtt_client_cfg.topic_subscribe = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/do'
-mqtt_client_cfg.topic_state = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/state'
-mqtt_client_cfg.topic_test = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/test'
-mqtt_client_cfg.topic_connect = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/connect'
+mqtt_client_cfg.topic_state     = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/state'
+mqtt_client_cfg.topic_test      = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/test'
+mqtt_client_cfg.topic_command   = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/command'
+mqtt_client_cfg.topic_connect   = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/connect'
+mqtt_client_cfg.device_identifiers  = mqtt_client_cfg.clientid -- nil  -- mqtt_client_cfg.clientid
+mqtt_client_cfg.device_manufacturer = "CustomMQTT"
+mqtt_client_cfg.device_model        = "Light Controller v1"
+mqtt_client_cfg.device_name         = "Light Controller"
+
 
 print(mqtt_client_cfg.topic_subscribe)
 print(mqtt_client_cfg.topic_state)
@@ -70,7 +76,7 @@ end)
 
 -- homeassistant/binary_sensor/lights_4/config
 -- {
---   "name": "Lights_4",
+--   "name": "Lights 4 Sensor",
 --   "unique_id": "lights_4_sensor",
 --   "state_topic": "homeassistant/sensor/483fda75b4b7/state",
 --   "payload_on": "On",
@@ -89,7 +95,7 @@ end)
 --   "name": "Light 4 Switch",
 --   "unique_id": "light_4_switch",
 --   "state_topic": "homeassistant/sensor/483fda75b4b7/state",
---   "command_topic": "homeassistant/sensor/483fda75b4b7/do",
+--   "command_topic": "homeassistant/sensor/483fda75b4b7/command",
 --   "payload_on": "SWITCHOn",
 --   "payload_off": "SWITCHOff",
 --   "state_on": "On",
@@ -97,41 +103,97 @@ end)
 --   "value_template": "{{ value_json.Lights_4 }}",
 --   "qos": 0,
 --   "retain": false,
---   "device": {
---     "identifiers": ["483fda75b4b7"],
---     "manufacturer": "CustomMQTT",
---     "model": "Light Controller v1",
---     "name": "Light 4 Controller"
---   }
+--   "device": {"identifiers": ["483fda75b4b7"],"manufacturer": "CustomMQTT","model": "Light Controller v1","name": "Light 4 Controller"}
 -- }
+-- "CONFIGdevice_class:temperature,name:Temp_C,unit_of_measurement:°C,value_template:{{value_json.tC}}"  ,payload_on:SWITCHOn,payload_off:SWITCHOff,state_on:On,state_off:Off
 
+local device_info = function(name)
+    local s = ', "device": { "identifiers": [ "' .. mqtt_client_cfg.clientid .. '" ], "manufacturer": "espMQRepeater", "model": "esp8266", "name": "espMQRepeater ' .. mqtt_client_cfg.clientid .. '" }'
+    return s
+end
+-- local safe_name = string.lower(string.gsub(name, "%s+", "_"))
 
+local configDevice = function(name, device_class, unit_of_measurement, value_template)
+    local str = '{ '
+    str = str .. '"name": "' .. name .. '", '
+    str = str .. '"unique_id": "' .. string.lower(string.gsub(name, "%s+", "_")) .. '_sensor", '
+    str = str .. '"state_topic": "' .. mqtt_client_cfg.topic_state .. '", '
+    if device_class ~= nil then
+        str = str .. '"device_class": "' .. device_class .. '", '
+    end
+    if unit_of_measurement ~= nil then
+        str = str .. '"unit_of_measurement": "' .. unit_of_measurement .. '", '
+    end
+    if value_template ~= nil then
+        str = str .. '"value_template": "' .. value_template .. '", '
+    end
+    str = str .. device_info(name)
+    str = str .. ' }'
+    return str
+end
+
+-- helper to normalize names: lowercase + underscores
+local function normalize_name(n)
+    -- replace spaces with underscores
+    local safe = string.gsub(n, "%s+", "_")
+    -- convert to lowercase
+    safe = string.lower(safe)
+    return safe
+end
+
+local function template(t)
+    local name = ''
+    local payload_on = "SWITCHOn"
+    local payload_off = "SWITCHOff"
+    local state_on = "On"
+    local state_off = "Off"
+    local stringBulder = "{ "
+    -- "CONFIGdevice_class:temperature,name:Temp_C,unit_of_measurement:°C,value_template:{{value_json.tC}}"
+    local outerTable = mysplit(t, ",")
+    for i = 1, #outerTable do
+        local b = outerTable[i]
+        local innerTable = mysplit(b, ":")
+        stringBulder = stringBulder .. quote_d(innerTable[1]) .. ":" .. quote_d(innerTable[2])
+        stringBulder = stringBulder .. ","
+        if innerTable[1] == "name" then
+            name = innerTable[2]
+        end
+    end
+    if mqtt_client_cfg.device_identifiers ~= nil then
+        stringBulder = stringBulder .. '"device": {"identifiers": [' .. quote_d(mqtt_client_cfg.device_identifiers) .. '],"manufacturer": ' .. quote_d(mqtt_client_cfg.manufacturer) .. ',"model": ' .. quote_d(mqtt_client_cfg.model) .. ',"name": ' .. quote_d(mqtt_client_cfg.name) .. '},'
+    end
+    stringBulder = stringBulder .. quote_d('state_topic') .. ":" .. quote_d(mqtt_client_cfg.topic_state)
+    stringBulder = stringBulder .. " }"
+    return name, stringBulder
+end
 
 -- publish the state, data comes from UART
 local publish_state = function(data)
     local p = "CONFIG"
     data = trim2(data)
     if data:sub(0, #p) == p then
-        local name = ''
-        local value_template = ''
-        local stringBulder = "{ "
         local t = (data:sub(0, #p) == p) and data:sub(#p + 1) or data
-        -- "CONFIGdevice_class:temperature,name:Temp_C,unit_of_measurement:°C,value_template:{{value_json.tC}}"
-        local outerTable = mysplit(t, ",")
-        for i = 1, #outerTable do
-            local b = outerTable[i]
-            local innerTable = mysplit(b, ":")
-            stringBulder = stringBulder .. quote_d(innerTable[1]) .. ":" .. quote_d(innerTable[2])
-            stringBulder = stringBulder .. ","
-            if innerTable[1] == "name" then
-                name = innerTable[2]
-            end
-            if innerTable[1] == "value_template" then
-                value_template = innerTable[2]
-            end
-        end
-        stringBulder = stringBulder .. quote_d('state_topic') .. ":" .. quote_d(mqtt_client_cfg.topic_state)
-        stringBulder = stringBulder .. " }"
+        template(t)
+        -- local name = ''
+        -- local value_template = ''
+        -- local stringBulder = "{ "
+        -- -- "CONFIGdevice_class:temperature,name:Temp_C,unit_of_measurement:°C,value_template:{{value_json.tC}}"
+        -- local outerTable = mysplit(t, ",")
+        -- for i = 1, #outerTable do
+        --     local b = outerTable[i]
+        --     local innerTable = mysplit(b, ":")
+        --     stringBulder = stringBulder .. quote_d(innerTable[1]) .. ":" .. quote_d(innerTable[2])
+        --     stringBulder = stringBulder .. ","
+        --     if innerTable[1] == "name" then
+        --         name = innerTable[2]
+        --     end
+        --     if innerTable[1] == "value_template" then
+        --         value_template = innerTable[2]
+        --     end
+        -- end
+        -- stringBulder = stringBulder .. quote_d('state_topic') .. ":" .. quote_d(mqtt_client_cfg.topic_state)
+        -- stringBulder = stringBulder .. " }"
+        local name, stringBulder = template(t)
         c:publish('homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/' .. name .. '/config', stringBulder, 0, 1)
         do
             return
