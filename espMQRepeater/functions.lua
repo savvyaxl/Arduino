@@ -10,6 +10,9 @@ function mysplit (inputstr, sep)
 end
 
 function quote_d (inputstr)
+    if inputstr == nil then
+        return '""'
+    end
     return "\"" .. inputstr .. "\""
 end
 

@@ -242,7 +242,7 @@ void loop()
 }
 
 void config() {
-  Serial.println("CONFIGdevice_class:water,name:TEST OR,unit_of_measurement:L,value_template:{{value_json.test}},payload_on:SWITCHwaterOn,payload_off:SWITCHwaterOff");
+  Serial.println("CONFIGdevice_class:light,name:Light 3 Binary Sensor,value_template:{{value_json.L3BS}},payload_on:SWITCHlightOn,payload_off:SWITCHlightOff");
   // delay(500);
   // Serial.println("CONFIGdevice_class:water,name:TEST OR1,unit_of_measurement:L,value_template:{{value_json.test1}},payload_on:SWITCHwaterOn,payload_off:SWITCHwaterOff");
   // -- "CONFIGdevice_class:light,name:Light 5 Sensor,unit_of_measurement:°C,value_template:{{value_json.light_5_sensor}}"
@@ -464,7 +464,6 @@ void printDateTime(const RtcDateTime &dt, String lable)
 String returnDateTime(const RtcDateTime &dt)
 {
   char datestring[20];
-  String dow = getDOW(dt);
   snprintf_P(datestring,
              countof(datestring),
              PSTR("%02u/%02u/%04u %02u:%02u:%02u"),
@@ -474,24 +473,14 @@ String returnDateTime(const RtcDateTime &dt)
              dt.Hour(),
              dt.Minute(),
              dt.Second());
-  String str = dow + " ";
-  return str + datestring;
+  return String(datestring);
 }
 
 String str;
 void printJSON(const RtcDateTime &dt, String lable, String state)
 {
-  char datestring[20];
+  String datestring = returnDateTime(dt);
   String dow = getDOW(dt);
-  snprintf_P(datestring,
-             countof(datestring),
-             PSTR("%02u/%02u/%04u %02u:%02u:%02u"),
-             dt.Month(),
-             dt.Day(),
-             dt.Year(),
-             dt.Hour(),
-             dt.Minute(),
-             dt.Second());
 
   str = String("{ ");
   str = str + String("\"") + String(lable) + String("_TIME") + String("\" : \"") + String(dow) + String(" ") + String(datestring) + String("\"");

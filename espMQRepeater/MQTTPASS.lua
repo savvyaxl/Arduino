@@ -20,7 +20,7 @@ mqtt_client_cfg.topic_state     = 'homeassistant/sensor/' .. mqtt_client_cfg.cli
 mqtt_client_cfg.topic_test      = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/test'
 mqtt_client_cfg.topic_command   = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/command'
 mqtt_client_cfg.topic_connect   = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/connect'
-mqtt_client_cfg.device_identifiers  = mqtt_client_cfg.clientid -- nil  -- mqtt_client_cfg.clientid
+mqtt_client_cfg.device              = true
 mqtt_client_cfg.device_manufacturer = "CustomMQTT"
 mqtt_client_cfg.device_model        = "Light Controller v1"
 mqtt_client_cfg.device_name         = "Light Controller"
@@ -143,10 +143,6 @@ end
 
 local function template(t)
     local name = ''
-    local payload_on = "SWITCHOn"
-    local payload_off = "SWITCHOff"
-    local state_on = "On"
-    local state_off = "Off"
     local stringBulder = "{ "
     -- "CONFIGdevice_class:temperature,name:Temp_C,unit_of_measurement:°C,value_template:{{value_json.tC}}"
     local outerTable = mysplit(t, ",")
@@ -159,9 +155,14 @@ local function template(t)
             name = innerTable[2]
         end
     end
-    if mqtt_client_cfg.device_identifiers ~= nil then
-        stringBulder = stringBulder .. '"device": {"identifiers": [' .. quote_d(mqtt_client_cfg.device_identifiers) .. '],"manufacturer": ' .. quote_d(mqtt_client_cfg.manufacturer) .. ',"model": ' .. quote_d(mqtt_client_cfg.model) .. ',"name": ' .. quote_d(mqtt_client_cfg.name) .. '},'
+    if mqtt_client_cfg.device ~= nil then
+        local id =  quote_d(mqtt_client_cfg.clientid)
+        local manufacturer = quote_d(mqtt_client_cfg.device_manufacturer)
+        local model = quote_d(mqtt_client_cfg.device_model)
+        local device_name = quote_d(mqtt_client_cfg.device_name)
+        stringBulder = stringBulder .. '"device": {"identifiers": [' .. id .. '],"manufacturer": ' .. manufacturer .. ',"model": ' .. model .. ',"name": ' .. device_name .. '},'
     end
+    stringBulder = stringBulder .. '"unique_id": ' .. quote_d(normalize_name(name)) .. ','
     stringBulder = stringBulder .. quote_d('state_topic') .. ":" .. quote_d(mqtt_client_cfg.topic_state)
     stringBulder = stringBulder .. " }"
     return name, stringBulder
@@ -173,26 +174,6 @@ local publish_state = function(data)
     data = trim2(data)
     if data:sub(0, #p) == p then
         local t = (data:sub(0, #p) == p) and data:sub(#p + 1) or data
-        template(t)
-        -- local name = ''
-        -- local value_template = ''
-        -- local stringBulder = "{ "
-        -- -- "CONFIGdevice_class:temperature,name:Temp_C,unit_of_measurement:°C,value_template:{{value_json.tC}}"
-        -- local outerTable = mysplit(t, ",")
-        -- for i = 1, #outerTable do
-        --     local b = outerTable[i]
-        --     local innerTable = mysplit(b, ":")
-        --     stringBulder = stringBulder .. quote_d(innerTable[1]) .. ":" .. quote_d(innerTable[2])
-        --     stringBulder = stringBulder .. ","
-        --     if innerTable[1] == "name" then
-        --         name = innerTable[2]
-        --     end
-        --     if innerTable[1] == "value_template" then
-        --         value_template = innerTable[2]
-        --     end
-        -- end
-        -- stringBulder = stringBulder .. quote_d('state_topic') .. ":" .. quote_d(mqtt_client_cfg.topic_state)
-        -- stringBulder = stringBulder .. " }"
         local name, stringBulder = template(t)
         c:publish('homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/' .. name .. '/config', stringBulder, 0, 1)
         do
