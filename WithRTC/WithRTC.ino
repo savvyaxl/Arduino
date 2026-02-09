@@ -3,7 +3,7 @@
 // mode 2: 16 hours
 // mode 3: 12 hours
 // mode 4 test
-int mode = 3;
+int mode = 2;
 
 // Water
 int timesPerWeek = 3;
@@ -231,7 +231,7 @@ void setup()
 
   printJSON(getRTCDateTime(now()), "getTime", "");
   printJSON(getRTCDateTime(Alarm.getNextTrigger()), "NextTrigger", "");
-  config();
+  // config();
 }
 
 void loop()
@@ -243,11 +243,6 @@ void loop()
 
 void config() {
   Serial.println("CONFIGdevice_class:light,name:Light 3 Binary Sensor,value_template:{{value_json.L3BS}},payload_on:SWITCHlightOn,payload_off:SWITCHlightOff");
-  // delay(500);
-  // Serial.println("CONFIGdevice_class:water,name:TEST OR1,unit_of_measurement:L,value_template:{{value_json.test1}},payload_on:SWITCHwaterOn,payload_off:SWITCHwaterOff");
-  // -- "CONFIGdevice_class:light,name:Light 5 Sensor,unit_of_measurement:°C,value_template:{{value_json.light_5_sensor}}"
-  //   delay(100);
-  // Serial.println("CONFIGdevice_class:water,name:Water_Pressure_Main,unit_of_measurement:L,value_template:{{value_json.WaterPressureMain|float*50/1024|int}}");
 }
 
 void readSerial()

@@ -1,5 +1,6 @@
 UART_ON = true
 MONITOR_MESSAGE = true
+SENSOR_TYPE = "sensor"
 
 -- MQTTPASS
 local myID = wifi.sta.getmac()
@@ -15,12 +16,12 @@ mqtt_client_cfg.host = credentials[sta_config.ssid].MQTTHOST
 mqtt_client_cfg.port = credentials[sta_config.ssid].MQTTPORT
 mqtt_client_cfg.user = credentials[sta_config.ssid].MQTTUSER
 mqtt_client_cfg.pass = credentials[sta_config.ssid].MQTTPASS
-mqtt_client_cfg.topic_subscribe = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/do'
-mqtt_client_cfg.topic_state     = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/state'
-mqtt_client_cfg.topic_test      = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/test'
-mqtt_client_cfg.topic_command   = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/command'
-mqtt_client_cfg.topic_connect   = 'homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/connect'
-mqtt_client_cfg.device              = true
+mqtt_client_cfg.topic_subscribe = 'homeassistant/' .. SENSOR_TYPE .. '/' .. mqtt_client_cfg.clientid .. '/do'
+mqtt_client_cfg.topic_state     = 'homeassistant/' .. SENSOR_TYPE .. '/' .. mqtt_client_cfg.clientid .. '/state'
+mqtt_client_cfg.topic_test      = 'homeassistant/' .. SENSOR_TYPE .. '/' .. mqtt_client_cfg.clientid .. '/test'
+mqtt_client_cfg.topic_command   = 'homeassistant/' .. SENSOR_TYPE .. '/' .. mqtt_client_cfg.clientid .. '/command'
+mqtt_client_cfg.topic_connect   = 'homeassistant/' .. SENSOR_TYPE .. '/' .. mqtt_client_cfg.clientid .. '/connect'
+mqtt_client_cfg.device              = nil
 mqtt_client_cfg.device_manufacturer = "CustomMQTT"
 mqtt_client_cfg.device_model        = "Light Controller v1"
 mqtt_client_cfg.device_name         = "Light Controller"
@@ -107,31 +108,6 @@ end)
 -- }
 -- "CONFIGdevice_class:temperature,name:Temp_C,unit_of_measurement:°C,value_template:{{value_json.tC}}"  ,payload_on:SWITCHOn,payload_off:SWITCHOff,state_on:On,state_off:Off
 
-local device_info = function(name)
-    local s = ', "device": { "identifiers": [ "' .. mqtt_client_cfg.clientid .. '" ], "manufacturer": "espMQRepeater", "model": "esp8266", "name": "espMQRepeater ' .. mqtt_client_cfg.clientid .. '" }'
-    return s
-end
--- local safe_name = string.lower(string.gsub(name, "%s+", "_"))
-
-local configDevice = function(name, device_class, unit_of_measurement, value_template)
-    local str = '{ '
-    str = str .. '"name": "' .. name .. '", '
-    str = str .. '"unique_id": "' .. string.lower(string.gsub(name, "%s+", "_")) .. '_sensor", '
-    str = str .. '"state_topic": "' .. mqtt_client_cfg.topic_state .. '", '
-    if device_class ~= nil then
-        str = str .. '"device_class": "' .. device_class .. '", '
-    end
-    if unit_of_measurement ~= nil then
-        str = str .. '"unit_of_measurement": "' .. unit_of_measurement .. '", '
-    end
-    if value_template ~= nil then
-        str = str .. '"value_template": "' .. value_template .. '", '
-    end
-    str = str .. device_info(name)
-    str = str .. ' }'
-    return str
-end
-
 -- helper to normalize names: lowercase + underscores
 local function normalize_name(n)
     -- replace spaces with underscores
@@ -175,7 +151,7 @@ local publish_state = function(data)
     if data:sub(0, #p) == p then
         local t = (data:sub(0, #p) == p) and data:sub(#p + 1) or data
         local name, stringBulder = template(t)
-        c:publish('homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/' .. name .. '/config', stringBulder, 0, 1)
+        c:publish('homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/' .. normalize_name(name) .. '/config', stringBulder, 0, 1)
         do
             return
         end
