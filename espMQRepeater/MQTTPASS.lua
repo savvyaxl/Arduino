@@ -151,7 +151,7 @@ local publish_state = function(data)
     if data:sub(0, #p) == p then
         local t = (data:sub(0, #p) == p) and data:sub(#p + 1) or data
         local name, stringBulder = template(t)
-        c:publish('homeassistant/sensor/' .. mqtt_client_cfg.clientid .. '/' .. normalize_name(name) .. '/config', stringBulder, 0, 1)
+        c:publish('homeassistant/' .. SENSOR_TYPE .. '/' .. mqtt_client_cfg.clientid .. '/' .. normalize_name(name) .. '/config', stringBulder, 0, 1)
         do
             return
         end
