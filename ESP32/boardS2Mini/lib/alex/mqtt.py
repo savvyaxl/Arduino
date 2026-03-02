@@ -19,7 +19,7 @@ class MQTTHandler:
         self,
         sensor_name="ESP",
         sensor_data=["Temperature", "Humidity"],
-        client_id=b'micropython_test_client_01'
+        client_id=f"micropython_test_client_{g.mac}"
     ):
         self.sensor_name = sensor_name
         self.sensor_data = sensor_data

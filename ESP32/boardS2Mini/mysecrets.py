@@ -19,4 +19,12 @@ secrets = [{
     'port' : 8883,
     'user' : 'admin',
     'pass' : 'admin'
+    },{
+    'ssid' : 'Linksys04810',             # Keep the two '' quotes around the name
+    'password' : '1y9hs1wpep',         # Keep the two '' quotes around password
+    'timezone' : "America/Sao_Paulo",  # http://worldtimeapi.org/timezones
+    'broker' : 'mqtt.savvyaxl.com.br',
+    'port' : 8883,
+    'user' : 'admin',
+    'pass' : 'admin'
     }]

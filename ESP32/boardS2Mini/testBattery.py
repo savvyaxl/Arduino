@@ -21,10 +21,15 @@ mqtt.publish_config()
 
 tester = BatteryTester(adc_pin_num=4, mosfet_pin_num=33, r_load=35.3)
 
+
 # Use a loop to catch every JSON update yielded by the generator
 for mqtt_json in tester.run_test_mqtt(cutoff_v=10.5, interval=10):
     # 'client' would be your Umqtt.simple instance
-    mqtt.publish(mqtt_json)
+    try:
+        mqtt.publish(mqtt_json)
+    except Exception as e:
+        print(f"Failed to publish MQTT message: {e}")
+
 
 # 1. SETUP
 # Use the pins from the diagram: ADC=34, MOSFET=32
