@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "syncId": "2ab9d456-82d6-4edf-9805-98b416213035",
+  "root": "c:\\Ansible\\Arduino\\pythoneBatteryTester",
+  "generatedAt": 1772411689453,
+  "files": {
+    "capacity_tester.py": {
+      "size": 2620,
+      "mtime": 1772305238918
+    },
+    "tester.py": {
+      "size": 1936,
+      "mtime": 1772245613085
+    }
+  }
+}
