@@ -9,10 +9,11 @@ class WiFiHandler:
         self.ssid = None
         self.channel = None
         self.rssi = None
-        self.wlan = network.WLAN(network.STA_IF)
-
+        
         # Activate the interface to enable Wi-Fi
+        self.wlan = network.WLAN(network.STA_IF)
         self.wlan.active(True)
+        
         self.disconnect_wifi()
         if self.wlan.isconnected():
             g.mac = ''.join(['%02x' % b for b in self.wlan.config('mac')])
@@ -42,8 +43,7 @@ class WiFiHandler:
         doBreak = False
         for net in scan_results:
             if doBreak:
-                break
-            
+                break            
             self.ssid = net[0].decode()
             self.channel = net[2]
             self.rssi = net[3]
@@ -60,7 +60,7 @@ class WiFiHandler:
                     g.mqpass = secret['pass']
                     doBreak = True
 
-    def connect_to_wifi(self,ssid, password):
+    def connect_to_wifi(self, ssid, password):
         if not self.wlan.isconnected():
             print("Connecting to network..." , "{:<30}".format(self.ssid))
             self.wlan.connect(ssid, password)
