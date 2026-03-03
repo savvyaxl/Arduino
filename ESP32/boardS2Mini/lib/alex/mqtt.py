@@ -19,7 +19,7 @@ class MQTTHandler:
         self,
         sensor_name="ESP",
         sensor_data=["Temperature", "Humidity"],
-        client_id=f"micropython_test_client_{g.mac}"
+        client_id=b'micropython_test_client_01'
     ):
         self.sensor_name = sensor_name
         self.sensor_data = sensor_data
@@ -40,6 +40,10 @@ class MQTTHandler:
             "humidity": "%",
             "pressure": "hPa",
             "co2": "ppm",
+            "current": "A",
+            "voltage": "V",
+            "energy": "Wh",
+            
             # Add more sensor types and units as needed
         }
 
@@ -57,7 +61,7 @@ class MQTTHandler:
             print(f"Failed to connect or subscribe: {e}")
 
     def disconnect(self):
-        print(f"Disconnecting to MQTT broker {g.broker}:{g.mqport}...")
+        print(f"Disconnecting from MQTT broker {g.broker}:{g.mqport}...")
         try:
             self.client.disconnect()
         except OSError as e:

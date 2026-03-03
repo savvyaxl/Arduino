@@ -3,6 +3,7 @@ import time
 import ntptime
 import globals as g
 from alex.capacity_tester import BatteryTester # Assuming your class is in this file
+import alex.wifi as WiFi
 
 try:
     ntptime.settime()
@@ -22,6 +23,7 @@ mqtt.publish_config()
 tester = BatteryTester(adc_pin_num=4, mosfet_pin_num=33, r_load=35.3)
 
 
+
 # Use a loop to catch every JSON update yielded by the generator
 for mqtt_json in tester.run_test_mqtt(cutoff_v=10.5, interval=10):
     # 'client' would be your Umqtt.simple instance
@@ -29,7 +31,13 @@ for mqtt_json in tester.run_test_mqtt(cutoff_v=10.5, interval=10):
         mqtt.publish(mqtt_json)
     except Exception as e:
         print(f"Failed to publish MQTT message: {e}")
-
+        if not WiFi.wlan.isconnected():
+            WiFi.connect_to_wifi(g.myssid, g.mypass)
+            try:
+                mqtt.check_msg()
+            except Exception as e:
+                mqtt.connect()  # Reconnect MQTT if needed
+                mqtt.publish_config()
 
 # 1. SETUP
 # Use the pins from the diagram: ADC=34, MOSFET=32
