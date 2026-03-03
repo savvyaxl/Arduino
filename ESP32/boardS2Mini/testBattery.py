@@ -32,7 +32,7 @@ for mqtt_json in tester.run_test_mqtt(cutoff_v=10.5, interval=10):
     except Exception as e:
         print(f"Failed to publish MQTT message: {e}")
         if not WiFi.wlan.isconnected():
-            WiFi.connect_to_wifi(g.myssid, g.mypass)
+            WiFi.reconnect_wifi()
             try:
                 mqtt.check_msg()
             except Exception as e:
