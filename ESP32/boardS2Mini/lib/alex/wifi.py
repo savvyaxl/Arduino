@@ -1,4 +1,4 @@
-import network
+import network # pyright: ignore[reportMissingImports]
 from mysecrets import secrets
 import globals as g
 import time
@@ -51,7 +51,7 @@ class WiFiHandler:
             for secret in secrets:
                 if self.ssid == secret['ssid']:
                     print("="*48)
-                    print("{:<30} {:<10} {:<8}".format(self.ssid, self.channel, self.rssi))
+                    # print("{:<30} {:<10} {:<8}".format(self.ssid, self.channel, self.rssi))
                     g.myssid = secret['ssid']
                     g.mypass = secret['password']
                     g.broker = secret['broker']
