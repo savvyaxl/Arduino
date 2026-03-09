@@ -3,9 +3,9 @@ import socket
 
 # 1. Setup PWM
 pwm_pin = Pin(33)
-pwm = PWM(pwm_pin, freq=1000, duty_u16=0) # Start at 0 speed
+pwm = PWM(pwm_pin, freq=1000, duty_u16=32768) # Default: 1kHz, 50% duty
 
-# 2. Web Server Setup (Assuming you are already connected to WiFi)
+# 2. Web Server Setup
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.bind(('', 80))
 s.listen(5)
@@ -15,43 +15,46 @@ while True:
         conn, addr = s.accept()
         request = conn.recv(1024).decode()
         
-        # Extract the path (e.g., "/speed?val=32768")
-        request_line = request.splitlines()[0]
-        path = request_line.split(" ")[1]
-
-        # --- Speed Control Logic ---
-        if "/speed" in path:
-            try:
-                # Extract value after "val="
-                speed_str = path.split("val=")[1]
-                duty_val = int(speed_str)
-                
-                # Constrain value between 0 and 65535
-                duty_val = max(0, min(65535, duty_val))
-                
-                pwm.duty_u16(duty_val) # Apply the speed
-                body = f"<h1>Speed set to: {duty_val}</h1>"
-            except:
-                body = "<h1>Error: Invalid Speed Value</h1>"
-        
-        elif path == "/temp":
-            body = "<h1>Temperature Reading...</h1>" # Add your sensor code here
+        # Simple routing logic
+        if "/update" in request:
+            # Check for duty cycle (speed) update
+            if "speed=" in request:
+                speed = int(request.split("speed=")[1].split(" ")[0])
+                pwm.duty_u16(max(0, min(65535, speed)))
+            
+            # Check for frequency update
+            if "freq=" in request:
+                freq = int(request.split("freq=")[1].split(" ")[0])
+                # ESP32 usually supports 1Hz to 40MHz, but 1-20000Hz is common for motors
+                pwm.freq(max(1, min(20000, freq)))
+            
+            # Send a quick "OK" so the page doesn't hang
+            conn.send("HTTP/1.1 204 No Content\r\n\r\n")
         else:
-            # Default page with a Slider UI
-            body = """
-            <h1>Motor Control</h1>
-            <p>Move the slider to change speed (0-65535):</p>
-            <input type="range" min="0" max="65535" onchange="window.location.href='/speed?val=' + this.value">
+            # Main UI with two sliders
+            body = f"""
+            <h1>ESP32 Control</h1>
+            
+            <p><strong>Speed (Duty):</strong> <span id="sVal">{pwm.duty_u16()}</span></p>
+            <input type="range" min="0" max="65535" value="{pwm.duty_u16()}" 
+                oninput="update('speed', this.value)">
+            
+            <p><strong>Frequency (Hz):</strong> <span id="fVal">{pwm.freq()}</span></p>
+            <input type="range" min="1" max="20000" value="{pwm.freq()}" 
+                oninput="update('freq', this.value)">
+
+            <script>
+            function update(type, val) {{
+                document.getElementById(type == 'speed' ? 'sVal' : 'fVal').innerText = val;
+                fetch('/update?' + type + '=' + val);
+            }}
+            </script>
             """
-
-        # 3. Send Response
-        HTTP_OK = "HTTP/1.1 200 OK\r\n"
-        ContentType = "Content-Type: text/html\r\n\r\n"
-        response = f"{HTTP_OK}{ContentType}<html><body>{body}</body></html>"
+            
+            response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html><body>" + body + "</body></html>"
+            conn.send(response.encode())
         
-        conn.send(response.encode())
         conn.close()
-
     except Exception as e:
-        print('Web server error:', e)
+        print("Error:", e)
         if 'conn' in locals(): conn.close()
