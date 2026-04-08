@@ -7,4 +7,6 @@
 #import time
 #time.sleep(1000)
 
-import alex.wifi
+#import alex.wifi
+from alex.wifi import WiFiHandler
+WiFiHandler()

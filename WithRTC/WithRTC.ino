@@ -3,11 +3,11 @@
 // mode 2: 16 hours
 // mode 3: 12 hours
 // mode 4 test
-int mode = 2;
+int mode = 3;
 
 // Water
-int timesPerWeek = 3;
-int duration = 30;
+int timesPerWeek = 6;
+int duration = 15;
 
 String indexNO = "3";
 int realStartDay = 2;            // Sunday is really 1, 2 is Monday
@@ -91,7 +91,10 @@ void setup()
 
   RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
   RtcDateTime errorDate = RtcDateTime(2165, 165, 165, 0, 0, 0);
+  Rtc.SetDateTime(compiled);
+    printJSON(Rtc.GetDateTime(), "get time", "");
 
+exit;
   if (!Rtc.IsDateTimeValid())
   {
     // Common Causes:
@@ -99,7 +102,9 @@ void setup()
     //    2) the battery on the device is low or even missing
 
     Serial.println("RTC lost confidence in the DateTime!");
+    Rtc.SetIsWriteProtected(false);
     Rtc.SetDateTime(compiled);
+    Rtc.SetIsWriteProtected(true);
   }
 
   if (Rtc.GetIsWriteProtected())
@@ -133,6 +138,9 @@ void setup()
   }
   else if (_time > compiled)
   {
+    Rtc.SetDateTime(compiled);
+    printJSON(compiled, "compiled", "");
+    Serial.println(_time.TotalDays());
     Serial.println("RTC is newer than compile time. (this is expected)");
   }
   else if (_time == compiled)
@@ -166,6 +174,8 @@ void setup()
       _time = Rtc.GetDateTime();
     }
     setTime(_time.Unix32Time());
+    
+    printJSON(getRTCDateTime(now()), "getTime", "");
     printJSON(_time, "RTCsetTime", "");
     // printJSON(now(),"getvvTime","f");
     // printDateTime(_time,"good");
@@ -173,7 +183,7 @@ void setup()
     // Serial.println(returnDateTime(compiled));
     // printJSON(getRTCDateTime(now()),"NextTrigger","");
 
-    // Serial.println(now());
+    Serial.println(now());
   }
 
   // Time update
@@ -212,7 +222,7 @@ void setup()
     // Lights
     Serial.println("No Lights");
   }
-
+  
   //  let's water
   for (int i = 1; i <= timesPerWeek; i++)
   {
