@@ -91,10 +91,8 @@ void setup()
 
   RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
   RtcDateTime errorDate = RtcDateTime(2165, 165, 165, 0, 0, 0);
-  Rtc.SetDateTime(compiled);
-    printJSON(Rtc.GetDateTime(), "get time", "");
 
-exit;
+
   if (!Rtc.IsDateTimeValid())
   {
     // Common Causes:
@@ -102,9 +100,7 @@ exit;
     //    2) the battery on the device is low or even missing
 
     Serial.println("RTC lost confidence in the DateTime!");
-    Rtc.SetIsWriteProtected(false);
     Rtc.SetDateTime(compiled);
-    Rtc.SetIsWriteProtected(true);
   }
 
   if (Rtc.GetIsWriteProtected())
@@ -127,7 +123,6 @@ exit;
     if (_time > errorDate)
     {
       Serial.println("RTC is older than compile time! But it is 165/165/2165 37:165 (Update canceled)");
-      Rtc.SetDateTime(compiled);
       Time_Error = true;
     }
     else
@@ -138,9 +133,8 @@ exit;
   }
   else if (_time > compiled)
   {
-    Rtc.SetDateTime(compiled);
+    // this is normal operation
     printJSON(compiled, "compiled", "");
-    Serial.println(_time.TotalDays());
     Serial.println("RTC is newer than compile time. (this is expected)");
   }
   else if (_time == compiled)
@@ -151,19 +145,9 @@ exit;
   if (Time_Error)
   {
     // setTime(compiled.Unix32Time());
-    setTime(compiled.Hour(), compiled.Minute(), compiled.Second(), compiled.Day(), compiled.Month(), compiled.Year());
-    Serial.println(DateMe(compiled.Unix32Time()));
-    Serial.println(compiled.Hour());
-    Serial.println(compiled.Minute());
-    Serial.println(compiled.Second());
-    Serial.println(compiled.Day());
-    Serial.println(compiled.Month());
-    Serial.println(compiled.Year());
-    printJSON(getRTCDateTime(now()), "now", "");
-    // printJSON(now(),"now2","");
-    printJSON(_time, "_time", "");
-    printJSON(compiled, "compiled", "");
-    // printDateTime(compiled,"label");
+    // the RTC is not attached
+    // setTime(compiled.Hour(), compiled.Minute(), compiled.Second(), compiled.Day(), compiled.Month(), compiled.Year());
+    setTime(compiled.Unix32Time());
   }
   else
   {
@@ -173,21 +157,12 @@ exit;
       Rtc.SetDateTime(compiled);
       _time = Rtc.GetDateTime();
     }
-    setTime(_time.Unix32Time());
-    
-    printJSON(getRTCDateTime(now()), "getTime", "");
-    printJSON(_time, "RTCsetTime", "");
-    // printJSON(now(),"getvvTime","f");
-    // printDateTime(_time,"good");
-    // printDateTime(compiled,"compiled");
-    // Serial.println(returnDateTime(compiled));
-    // printJSON(getRTCDateTime(now()),"NextTrigger","");
-
-    Serial.println(now());
+    setTime(_time.Unix32Time() );
   }
 
-  // Time update
-  Alarm.alarmRepeat(dowFriday, 0, 2, 0, ReadRTC); // reset the time at midnight once a week on Sunday
+  // Time update, should update every night
+  //Alarm.alarmRepeat(dowFriday, 0, 2, 0, ReadRTC); // reset the time at midnight once a week on Sunday
+  Alarm.alarmRepeat(0, 2, 0, ReadRTC);  //daily at 2:00am
 
   if (mode == 1)
   {
@@ -234,14 +209,12 @@ exit;
     Serial.print(F(":"));
     Serial.println(startMinute);
 
-    Alarm.alarmRepeat(getRealDow(startDay), startHour, startMinute, 0, WaterOn);
+    Alarm.alarmRepeat(getRealDow(startDay), startHour, startMinute, 0, WaterOn);  //
     Alarm.alarmRepeat(getRealDow(startDay), startHour, startMinute, duration, WaterOff);
     calcTimes();
   }
-
   printJSON(getRTCDateTime(now()), "getTime", "");
   printJSON(getRTCDateTime(Alarm.getNextTrigger()), "NextTrigger", "");
-  // config();
 }
 
 void loop()
@@ -578,7 +551,7 @@ void calcTimes()
   {
     float hours__ = float(hoursInWeek) / float(timesPerWeek);
     int minutes_ = (hours__ - int(hoursInWeek / timesPerWeek)) * 60;
-    startMinute = startMinute + minutes_ + 1; // somewhere in the float to int conversion I lose 1, it is 36 and not 35 for 5 times a week
+    startMinute = startMinute + minutes_ + 1; // somewhere in the float to int conversion I lose 1 minute, so I add it back here
     if (startMinute >= 60)
     {
       startMinute = startMinute - 60;
@@ -667,9 +640,8 @@ String DateMe(time_t t_unix_date1)
 
   return t;
 }
-
-// RtcDateTime getRTCDateTime(uint32_t t_unix_date1)
-RtcDateTime getRTCDateTime(time_t t_unix_date1)
+RtcDateTime getRTCDateTime(uint64_t t_unix_date1)
+// RtcDateTime getRTCDateTime(time_t t_unix_date1)
 {
   return RtcDateTime(year(t_unix_date1), month(t_unix_date1), day(t_unix_date1), hour(t_unix_date1), minute(t_unix_date1), second(t_unix_date1));
 }
