@@ -1,6 +1,6 @@
 import alex.mqtt as MQTT
 import time
-import ntptime
+import ntptime # type: ignore
 import globals as g
 from alex.capacity_tester import BatteryTester # Assuming your class is in this file
 import alex.wifi as WiFi

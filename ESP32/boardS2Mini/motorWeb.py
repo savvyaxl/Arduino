@@ -1,4 +1,4 @@
-from machine import Pin, PWM
+from machine import Pin, PWM # type: ignore
 import socket
 
 # 1. Setup PWM
