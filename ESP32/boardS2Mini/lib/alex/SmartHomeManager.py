@@ -41,6 +41,11 @@ class SmartHomeManager:
     async def _trigger_action(self, alarm):
         p = Pin(alarm['pin'], Pin.OUT)
         action = alarm.get('action', 'pulse')
+        name = alarm.get('name', 'Unnamed Alarm')
+        t = alarm['time']
+        
+        # The print statement you requested
+        print(f"ALARM TRIGGERED: {name} at {t[0]:02d}:{t[1]:02d}")
         if action == "on": p.value(1)
         elif action == "off": p.value(0)
         elif action == "pulse":
@@ -58,6 +63,7 @@ class SmartHomeManager:
                     if not al.get('triggered_today', False):
                         al['triggered_today'] = True
                         asyncio.create_task(self._trigger_action(al))
+                        print(f"Alarm triggered for Pin {al['pin']} at {h:02d}:{m:02d}:{s:02d}")
                 if m != al_m and al.get('triggered_today', False):
                     al['triggered_today'] = False
             await asyncio.sleep(0.8)
@@ -65,11 +71,20 @@ class SmartHomeManager:
     def _setup_routes(self):
         @self.app.route('/')
         async def index(request):
+            # Get Current RTC Time
+            now = self.rtc.datetime()
+            # Format: YYYY-MM-DD HH:MM:SS
+            current_time_str = f"{now[0]}-{now[1]:02d}-{now[2]:02d} {now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
+            # Get Day of Week Name
+            current_day = self.DAY_NAMES[now[3]]
+
             rows = ""
             for i, a in enumerate(self.alarms):
                 days_str = ", ".join([self.DAY_NAMES[d] for d in a['days']])
                 action_label = a.get('action', 'pulse').upper()
-                rows += f"<li>{a['time'][0]:02d}:{a['time'][1]:02d} | {days_str} | Pin:{a['pin']} | {action_label} <a class='del' href='/del?id={i}'>Delete</a></li>"
+                dur_info = f" | {a['duration']}s" if action_label == "PULSE" else ""
+                
+                rows += f"<li>{a['time'][0]:02d}:{a['time'][1]:02d} | {days_str} | Pin:{a['pin']} | {action_label}{dur_info} <a class='del' href='/del?id={i}'>Delete</a></li>"
             
             day_boxes = "".join([f'<label><input type="checkbox" name="days" value="{i}" class="day-check" checked> {name}</label> ' for i, name in enumerate(self.DAY_NAMES)])
 
@@ -79,6 +94,8 @@ class SmartHomeManager:
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <style>
                     body {{ font-family: sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }}
+                    .time-display {{ background: #333; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; border: 1px solid #03dac6; }}
+                    .time-display h3 {{ margin: 0; color: #03dac6; }}
                     ul {{ list-style: none; padding: 0; }}
                     li {{ background: #1e1e1e; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #333; }}
                     input, select {{ background: #2c2c2c; color: white; border: 1px solid #444; padding: 8px; border-radius: 4px; width: 100%; margin: 5px 0; }}
@@ -95,7 +112,12 @@ class SmartHomeManager:
                 </script>
             </head>
             <body>
-                <h2>ESP32 Alarms</h2>
+                <div class="time-display">
+                    <h3>{current_day} {current_time_str}</h3>
+                    <small><a href="/" style="color:#03dac6; text-decoration:none;">↻ Refresh Time</a></small>
+                </div>
+
+                <h2>Alarms</h2>
                 <ul>{rows if rows else "<li>No alarms set</li>"}</ul>
                 <hr>
                 <form action="/add">
