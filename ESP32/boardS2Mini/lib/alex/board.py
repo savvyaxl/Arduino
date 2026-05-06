@@ -1,7 +1,7 @@
 # board.py – LOLIN S2 Mini (ESP32-S2FN4R2)
 # Full GPIO aliasing + preconfigured buses for MicroPython
 
-import machine
+import machine # type: ignore
 
 # Pin dictionary based on full board mapping
 pins = {
