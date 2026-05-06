@@ -4,7 +4,7 @@ from alex.SmartHomeManager import SmartHomeManager
 
 # --- EXECUTION ---
 # Ensure you connect to WiFi first in boot.py or main.py
-manager = SmartHomeManager(utc_offset=-5)
+manager = SmartHomeManager(utc_offset=-3)
 try:
     asyncio.run(manager.run())
 except KeyboardInterrupt:

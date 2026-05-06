@@ -1,13 +1,13 @@
-import uasyncio as asyncio
-import json, ntptime, time, os
-from machine import RTC, Pin
-from microdot.microdot import Microdot # Using your specific import
+import uasyncio as asyncio # type: ignore
+import json, ntptime, time, os # type: ignore
+from machine import RTC, Pin # type: ignore
+from microdot.microdot import Microdot
 
 class SmartHomeManager:
     STORAGE_FILE = "alarms.json"
     DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-    def __init__(self, utc_offset=-5):
+    def __init__(self, utc_offset=-3):
         self.rtc = RTC()
         self.offset = utc_offset * 3600
         self.alarms = self._load_alarms()
@@ -36,22 +36,29 @@ class SmartHomeManager:
                 print("NTP Sync Successful")
                 await asyncio.sleep(86400) 
             except:
+                print("NTP Sync Failed, retrying...")
                 await asyncio.sleep(30)
 
     async def _trigger_action(self, alarm):
         p = Pin(alarm['pin'], Pin.OUT)
         action = alarm.get('action', 'pulse')
         name = alarm.get('name', 'Unnamed Alarm')
-        t = alarm['time']
         
-        # The print statement you requested
-        print(f"ALARM TRIGGERED: {name} at {t[0]:02d}:{t[1]:02d}")
-        if action == "on": p.value(1)
-        elif action == "off": p.value(0)
+        # Get current time for the print statement
+        now = self.rtc.datetime()
+        ts = f"{now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
+        
+        print(f"ALARM TRIGGERED: '{name}' at {ts} | Action: {action.upper()}")
+
+        if action == "on": 
+            p.value(1)
+        elif action == "off": 
+            p.value(0)
         elif action == "pulse":
             p.value(1)
             await asyncio.sleep(int(alarm['duration']))
             p.value(0)
+            print(f"ALARM FINISHED: '{name}' pulse complete.")
 
     async def alarm_checker_loop(self):
         while True:
@@ -63,7 +70,6 @@ class SmartHomeManager:
                     if not al.get('triggered_today', False):
                         al['triggered_today'] = True
                         asyncio.create_task(self._trigger_action(al))
-                        print(f"Alarm triggered for Pin {al['pin']} at {h:02d}:{m:02d}:{s:02d}")
                 if m != al_m and al.get('triggered_today', False):
                     al['triggered_today'] = False
             await asyncio.sleep(0.8)
@@ -71,11 +77,8 @@ class SmartHomeManager:
     def _setup_routes(self):
         @self.app.route('/')
         async def index(request):
-            # Get Current RTC Time
             now = self.rtc.datetime()
-            # Format: YYYY-MM-DD HH:MM:SS
             current_time_str = f"{now[0]}-{now[1]:02d}-{now[2]:02d} {now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
-            # Get Day of Week Name
             current_day = self.DAY_NAMES[now[3]]
 
             rows = ""
@@ -83,8 +86,9 @@ class SmartHomeManager:
                 days_str = ", ".join([self.DAY_NAMES[d] for d in a['days']])
                 action_label = a.get('action', 'pulse').upper()
                 dur_info = f" | {a['duration']}s" if action_label == "PULSE" else ""
+                name = a.get('name', 'Alarm')
                 
-                rows += f"<li>{a['time'][0]:02d}:{a['time'][1]:02d} | {days_str} | Pin:{a['pin']} | {action_label}{dur_info} <a class='del' href='/del?id={i}'>Delete</a></li>"
+                rows += f"<li><strong>{name}</strong><br>{a['time'][0]:02d}:{a['time'][1]:02d} | {days_str} | Pin:{a['pin']} | {action_label}{dur_info} <a class='del' href='/del?id={i}'>Delete</a></li>"
             
             day_boxes = "".join([f'<label><input type="checkbox" name="days" value="{i}" class="day-check" checked> {name}</label> ' for i, name in enumerate(self.DAY_NAMES)])
 
@@ -97,10 +101,10 @@ class SmartHomeManager:
                     .time-display {{ background: #333; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; border: 1px solid #03dac6; }}
                     .time-display h3 {{ margin: 0; color: #03dac6; }}
                     ul {{ list-style: none; padding: 0; }}
-                    li {{ background: #1e1e1e; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #333; }}
-                    input, select {{ background: #2c2c2c; color: white; border: 1px solid #444; padding: 8px; border-radius: 4px; width: 100%; margin: 5px 0; }}
+                    li {{ background: #1e1e1e; padding: 10px; margin-bottom: 15px; border-radius: 5px; border: 1px solid #333; line-height: 1.6; }}
+                    input, select {{ background: #2c2c2c; color: white; border: 1px solid #444; padding: 8px; border-radius: 4px; width: 100%; margin: 5px 0; box-sizing: border-box; }}
                     input[type="checkbox"] {{ width: auto; }}
-                    .btn {{ background: #03dac6; color: black; border: none; padding: 10px; width: 100%; font-weight: bold; cursor: pointer; border-radius: 4px; }}
+                    .btn {{ background: #03dac6; color: black; border: none; padding: 12px; width: 100%; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 10px; }}
                     .del {{ color: #cf6679; text-decoration: none; float: right; font-weight: bold; }}
                     hr {{ border: 0; border-top: 1px solid #333; margin: 20px 0; }}
                 </style>
@@ -117,10 +121,11 @@ class SmartHomeManager:
                     <small><a href="/" style="color:#03dac6; text-decoration:none;">↻ Refresh Time</a></small>
                 </div>
 
-                <h2>Alarms</h2>
+                <h2>Active Alarms</h2>
                 <ul>{rows if rows else "<li>No alarms set</li>"}</ul>
                 <hr>
                 <form action="/add">
+                    Alarm Name: <input type="text" name="n" value="Alarm">
                     Time: <input type="time" name="t" required>
                     Pin: <input type="number" name="p" value="2">
                     Action: <select name="a">
@@ -147,6 +152,7 @@ class SmartHomeManager:
             days_raw = request.args.getlist('days')
             selected_days = [int(d) for d in days_raw] if days_raw else list(range(7))
             self.alarms.append({
+                "name": request.args.get('n', 'Alarm'),
                 "time": [int(t_parts[0]), int(t_parts[1]), 0],
                 "days": selected_days,
                 "action": request.args.get('a'),
