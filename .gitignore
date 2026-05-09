@@ -1,5 +1,9 @@
 .vscode
 credentials.lua
 build
+*.key
+*.key.der
 client.key
+client.key.der
+mysecrets.py
 tls.cert

@@ -3,7 +3,8 @@
 # which would be not great. So, instead, keep it all in this one file and
 # keep it a secret.
 
-secrets = [{
+secrets = [
+    {
     'ssid' : 'AndroidAP_optout',             # Keep the two '' quotes around the name
     'password' : 'czap2554',         # Keep the two '' quotes around password
     'timezone' : "America/Sao_Paulo",  # http://worldtimeapi.org/timezones
