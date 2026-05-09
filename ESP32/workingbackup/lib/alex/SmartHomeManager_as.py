@@ -4,6 +4,7 @@ from machine import RTC, Pin # type: ignore
 from microdot.microdot import Microdot
 import gc, network # type: ignore
 from mysecrets import secrets
+import alex.my_mqtt_as as MQTT
 
 class SmartHomeManager:
     STORAGE_FILE = "alarms.json"
@@ -15,6 +16,7 @@ class SmartHomeManager:
         self.alarms = self._load_alarms()
         self.app = Microdot()
         self._setup_routes()
+        self.mqtt = MQTT.MQTTHandler()
 
     def get_best_network():
         wlan = network.WLAN(network.STA_IF)
@@ -28,6 +30,9 @@ class SmartHomeManager:
                     return secret # Return the whole dict
         return None
 
+    def getTime(self):
+        dt = self.rtc.datetime()
+        return f"{dt[0]}-{dt[1]:02d}-{dt[2]:02d} {dt[4]:02d}:{dt[5]:02d}:{dt[6]:02d}"
 
     def _load_alarms(self):
         try:
@@ -68,12 +73,16 @@ class SmartHomeManager:
 
         if action == "on": 
             p.value(1)
+            self.mqtt.publish(f"{name} On at {ts}")
         elif action == "off": 
             p.value(0)
+            self.mqtt.publish(f"{name} Off at {ts}")
         elif action == "pulse":
             p.value(1)
+            self.mqtt.publish(f"Pulse '{name}' Started at {ts} for {int(alarm['duration'])}")
             await asyncio.sleep(int(alarm['duration']))
             p.value(0)
+            self.mqtt.publish(f"Pulse '{name}' Ended at {self.getTime()}")
             print(f"ALARM FINISHED: '{name}' pulse complete.")
 
     async def alarm_checker_loop(self):
@@ -82,7 +91,7 @@ class SmartHomeManager:
             now = self.rtc.datetime()
             wd, h, m = now[3], now[4], now[5]
             for al in self.alarms:
-                al_h, al_m = al['time']
+                al_h, al_m, al_s = al['time']
                 if wd in al['days'] and h == al_h and m == al_m:
                     if not al.get('triggered_today', False):
                         al['triggered_today'] = True
@@ -189,21 +198,33 @@ class SmartHomeManager:
             return "", 302, {'Location': '/'}
 
     async def run(self):
-        net_secret = self.get_best_network()
-        if net_secret:
-            from micropython-mqtt.mqtt_as import config, MQTTClient
-            config['ssid'] = net_secret['ssid']
-            config['wifi_pw'] = net_secret['password']
-            config['server'] = net_secret['broker']
-            config['port'] = net_secret['port']
-            config['user'] = net_secret['user']
-            config['password'] = net_secret['pass']
-            config['ssl'] = context 
-            
-            self.mqtt_client = MQTTClient(config)
-            await self.mqtt_client.connect() # Async connection!
+        # net_secret = self.get_best_network()
+        # if net_secret:
+        #     from micropython-mqtt.mqtt_as import config, MQTTClient
+        #     config['ssid'] = net_secret['ssid']
+        #     config['wifi_pw'] = net_secret['password']
+        #     config['server'] = net_secret['broker']
+        #     config['port'] = net_secret['port']
+        #     config['user'] = net_secret['user']
+        #     config['password'] = net_secret['pass']
+        #     config['ssl'] = context 
+
+
+        self.mqtt.connect()
+        self.mqtt.publish("This is good")
+
+            # self.mqtt_client = MQTTClient(config)
+            # await self.mqtt_client.connect() # Async connection!
 
         asyncio.create_task(self.sync_time())
         asyncio.create_task(self.alarm_checker_loop())
         print("Server running on port 80...")
         await self.app.start_server(port=80)
+
+# --- 3. Entry Point ---
+if __name__ == "__main__":
+    manager = SmartHomeManager()
+    try:
+        asyncio.run(manager.run())
+    except KeyboardInterrupt:
+        pass

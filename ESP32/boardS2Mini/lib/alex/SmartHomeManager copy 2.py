@@ -1,10 +1,23 @@
 import uasyncio as asyncio # type: ignore
-import json, ntptime, time, os # type: ignore
+import json, ntptime, time, network, ssl # type: ignore
 from machine import RTC, Pin # type: ignore
 from microdot.microdot import Microdot
-import gc, network # type: ignore
+from micropython-mqtt.mqtt_as import MQTTClient, config
 from mysecrets import secrets
 
+# --- 1. WiFi Scanner Logic (Modified to not block) ---
+def get_best_network():
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    scan_results = wlan.scan()
+    for net in scan_results:
+        ssid = net[0].decode()
+        for secret in secrets:
+            if ssid == secret['ssid']:
+                return secret
+    return None
+
+# --- 2. Smart Home Manager ---
 class SmartHomeManager:
     STORAGE_FILE = "alarms.json"
     DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -14,27 +27,14 @@ class SmartHomeManager:
         self.offset = utc_offset * 3600
         self.alarms = self._load_alarms()
         self.app = Microdot()
+        self.mqtt = None
         self._setup_routes()
-
-    def get_best_network():
-        wlan = network.WLAN(network.STA_IF)
-        wlan.active(True)
-        scan_results = wlan.scan()
-        
-        for net in scan_results:
-            ssid = net[0].decode()
-            for secret in secrets:
-                if ssid == secret['ssid']:
-                    return secret # Return the whole dict
-        return None
-
 
     def _load_alarms(self):
         try:
             with open(self.STORAGE_FILE, "r") as f:
                 return json.load(f)
-        except:
-            return []
+        except: return []
 
     def _save_alarms(self):
         with open(self.STORAGE_FILE, "w") as f:
@@ -43,53 +43,47 @@ class SmartHomeManager:
     async def sync_time(self):
         while True:
             try:
-                gc.collect()
                 ntptime.settime()
                 t = time.time() + self.offset
                 tm = time.localtime(t)
-                # ESP32 RTC: (y, m, d, wd, h, m, s, ss)
                 self.rtc.datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
                 print("NTP Sync Successful")
                 await asyncio.sleep(86400) 
             except:
-                print("NTP Sync Failed, retrying...")
+                print("NTP Sync Failed, retrying in 30s...")
                 await asyncio.sleep(30)
 
     async def _trigger_action(self, alarm):
         p = Pin(alarm['pin'], Pin.OUT)
         action = alarm.get('action', 'pulse')
-        name = alarm.get('name', 'Unnamed Alarm')
+        name = alarm.get('name', 'Alarm')
         
-        # Get current time for the print statement
-        now = self.rtc.datetime()
-        ts = f"{now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
-        
-        print(f"ALARM TRIGGERED: '{name}' at {ts} | Action: {action.upper()}")
-
-        if action == "on": 
-            p.value(1)
-        elif action == "off": 
-            p.value(0)
+        # Hardware Action
+        if action == "on": p.value(1)
+        elif action == "off": p.value(0)
         elif action == "pulse":
             p.value(1)
             await asyncio.sleep(int(alarm['duration']))
             p.value(0)
-            print(f"ALARM FINISHED: '{name}' pulse complete.")
+
+        # MQTT Action
+        if self.mqtt:
+            msg = json.dumps({"event": "alarm_triggered", "name": name, "action": action})
+            await self.mqtt.publish("home/alarms/events", msg, qos=1)
 
     async def alarm_checker_loop(self):
         while True:
-            gc.collect()
             now = self.rtc.datetime()
             wd, h, m = now[3], now[4], now[5]
             for al in self.alarms:
-                al_h, al_m = al['time']
+                al_h, al_m = al['time'][0], al['time'][1]
                 if wd in al['days'] and h == al_h and m == al_m:
                     if not al.get('triggered_today', False):
                         al['triggered_today'] = True
                         asyncio.create_task(self._trigger_action(al))
-                if m != al_m and al.get('triggered_today', False):
+                elif m != al_m:
                     al['triggered_today'] = False
-            await asyncio.sleep(10)
+            await asyncio.sleep(10) # 10s check is plenty for minute-based alarms
 
     def _setup_routes(self):
         @self.app.route('/')
@@ -163,47 +157,43 @@ class SmartHomeManager:
             """
             return html, 200, {'Content-Type': 'text/html'}
 
-        @self.app.route('/add')
-        async def add(request):
-            t_parts = request.args.get('t').split(':')
-            days_raw = request.args.getlist('days')
-            selected_days = [int(d) for d in days_raw] if days_raw else list(range(7))
-            self.alarms.append({
-                "name": request.args.get('n', 'Alarm'),
-                "time": [int(t_parts[0]), int(t_parts[1]), 0],
-                "days": selected_days,
-                "action": request.args.get('a'),
-                "duration": int(float(request.args.get('d', 0))),
-                "pin": int(request.args.get('p')),
-                "triggered_today": False
-            })
-            self._save_alarms()
-            return "", 302, {'Location': '/'}
-
-        @self.app.route('/del')
-        async def delete(request):
-            idx = int(request.args.get('id'))
-            if 0 <= idx < len(self.alarms):
-                self.alarms.pop(idx)
-                self._save_alarms()
-            return "", 302, {'Location': '/'}
-
     async def run(self):
-        net_secret = self.get_best_network()
-        if net_secret:
-            from micropython-mqtt.mqtt_as import config, MQTTClient
-            config['ssid'] = net_secret['ssid']
-            config['wifi_pw'] = net_secret['password']
-            config['server'] = net_secret['broker']
-            config['port'] = net_secret['port']
-            config['user'] = net_secret['user']
-            config['password'] = net_secret['pass']
-            config['ssl'] = context 
-            
-            self.mqtt_client = MQTTClient(config)
-            await self.mqtt_client.connect() # Async connection!
+        # 1. Find Network
+        net = get_best_network()
+        if not net:
+            print("No known WiFi found!")
+            return
 
+        # 2. Setup SSL & MQTT Config
+        # Assuming your SSLContext class is in ssl_helper.py
+        from ssl import SSLContext # type: ignore
+        my_ssl = SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        my_ssl.load_cert_chain("client.crt", "client.key")
+        my_ssl.load_verify_locations("CA.crt")
+        
+        config['ssid'] = g.myssid
+        config['wifi_pw'] = g.mypass
+        config['server'] = g.broker
+        config['port'] = g.mqport
+        config['user'] = g.mquser
+        config['password'] = g.mqpass
+        config['ssl'] = my_ssl._context # Use the internal MicroPython TLS object
+        
+        # 3. Start MQTT
+        self.mqtt = MQTTClient(config)
+        await self.mqtt.connect()
+        
+        # 4. Launch Background Tasks
         asyncio.create_task(self.sync_time())
         asyncio.create_task(self.alarm_checker_loop())
-        print("Server running on port 80...")
+        
+        print(f"System Ready. IP: {network.WLAN(network.STA_IF).ifconfig()[0]}")
         await self.app.start_server(port=80)
+
+# --- 3. Entry Point ---
+if __name__ == "__main__":
+    manager = SmartHomeManager()
+    try:
+        asyncio.run(manager.run())
+    except KeyboardInterrupt:
+        pass

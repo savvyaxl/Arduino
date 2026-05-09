@@ -1,5 +1,6 @@
 import uasyncio as asyncio # type: ignore
 from alex.SmartHomeManager import SmartHomeManager
+import gc
 
 # --- EXECUTION ---
 # Ensure you connect to WiFi first in boot.py or main.py

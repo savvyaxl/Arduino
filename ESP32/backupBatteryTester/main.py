@@ -1,2 +1,3 @@
-import testAlarms3
+#import testAlarms3
 #from alex.SmartHomeManager import SmartHomeManager
+import SmartHomeManager
