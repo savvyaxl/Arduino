@@ -5,6 +5,7 @@ from microdot.microdot import Microdot
 import gc, network # type: ignore
 from mysecrets import secrets
 import alex.mqtt as MQTT
+import globals as g
 
 class SmartHomeManager:
     STORAGE_FILE = "alarms.json"
@@ -17,18 +18,18 @@ class SmartHomeManager:
         self.app = Microdot()
         self._setup_routes()
         self.mqtt = MQTT.MQTTHandler()
-
-    def get_best_network():
-        wlan = network.WLAN(network.STA_IF)
-        wlan.active(True)
-        scan_results = wlan.scan()
-        
-        for net in scan_results:
-            ssid = net[0].decode()
-            for secret in secrets:
-                if ssid == secret['ssid']:
-                    return secret # Return the whole dict
-        return None
+        self.allowed_pins = {
+            "Light": {
+                "pin": 15,
+                "value": "light_state",
+                "value_template": "{{ value_json.light_state }}"
+            },
+            "Water Pump": {
+                "pin": 4,
+                "value": "pump_status",
+                "value_template": "{{ value_json.pump_status }}"
+            }
+        }
 
     def getTime(self):
         dt = self.rtc.datetime()
@@ -67,11 +68,17 @@ class SmartHomeManager:
             await asyncio.sleep(sleep_interval)
             await self.sync_time()
 
+    async def formatted_message(self, alarm, msg):
+        clean_name = alarm['pin_name'].lower().replace(" ", "_")
+        data = {}
+        data[clean_name] = msg
+        return json.dumps(data) if data else "{}"
+
     async def _trigger_action(self, alarm):
         p = Pin(alarm['pin'], Pin.OUT)
         action = alarm.get('action', 'pulse')
         name = alarm.get('name', 'Unnamed Alarm')
-        
+
         # Get current time for the print statement
         now = self.rtc.datetime()
         ts = f"{now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
@@ -81,25 +88,29 @@ class SmartHomeManager:
         if action == "on": 
             p.value(1)
             try:
-                self.mqtt.publish(f"{name} On at {ts}")
+                print(alarm)
+                self.mqtt.publish(await self.formatted_message(alarm, "ON"))
             except Exception as e:
                 print(f"Error occurred while publishing MQTT message: {e}")
         elif action == "off": 
             p.value(0)
             try:
-                self.mqtt.publish(f"{name} Off at {ts}")
+                print(alarm)
+                self.mqtt.publish(await self.formatted_message(alarm, "OFF"))
             except Exception as e:
                 print(f"Error occurred while publishing MQTT message: {e}")
         elif action == "pulse":
             p.value(1)
             try:
-                self.mqtt.publish(f"Pulse '{name}' Started at {ts} for {int(alarm['duration'])}")
+                print(alarm)
+                self.mqtt.publish(await self.formatted_message(alarm, "ON"))
             except Exception as e:
                 print(f"Error occurred while publishing MQTT message: {e}")
             await asyncio.sleep(int(alarm['duration']))
             p.value(0)
             try:
-                self.mqtt.publish(f"Pulse '{name}' Ended at {self.getTime()}")
+                print(alarm)
+                self.mqtt.publish(await self.formatted_message(alarm, "OFF"))
             except Exception as e:
                 print(f"Error occurred while publishing MQTT message: {e}")
             print(f"ALARM FINISHED: '{name}' pulse complete.")
@@ -137,6 +148,8 @@ class SmartHomeManager:
                 rows += f"<li><strong>{name}</strong><br>{a['time'][0]:02d}:{a['time'][1]:02d} | {days_str} | Pin:{a['pin']} | {action_label}{dur_info} <a class='del' href='/del?id={i}'>Delete</a></li>"
             
             day_boxes = "".join([f'<label><input type="checkbox" name="days" value="{i}" class="day-check" checked> {name}</label> ' for i, name in enumerate(self.DAY_NAMES)])
+            pin_options = "".join([f'<option value="{name[0]}">{name[0]}</option>' 
+                            for name in self.allowed_pins.items()])
 
             html = f"""
             <html>
@@ -173,7 +186,9 @@ class SmartHomeManager:
                 <form action="/add">
                     Alarm Name: <input type="text" name="n" value="Alarm">
                     Time: <input type="time" name="t" required>
-                    Pin: <input type="number" name="p" value="2">
+                    Device: <select name="pn">
+                        {pin_options}
+                    </select>
                     Action: <select name="a">
                         <option value="pulse">Pulse (Timed)</option>
                         <option value="on">Permanent ON</option>
@@ -197,15 +212,26 @@ class SmartHomeManager:
             t_parts = request.args.get('t').split(':')
             days_raw = request.args.getlist('days')
             selected_days = [int(d) for d in days_raw] if days_raw else list(range(7))
+            name_selection = request.args.get('pn')
+            clean_name = name_selection.lower().replace(" ", "_")
+
+            if name_selection in self.allowed_pins:
+                actual_gpio = self.allowed_pins[name_selection]["pin"]
+            else:
+                return "Invalid Pin Selection", 400 
+
             self.alarms.append({
                 "name": request.args.get('n', 'Alarm'),
                 "time": [int(t_parts[0]), int(t_parts[1]), 0],
                 "days": selected_days,
                 "action": request.args.get('a'),
                 "duration": int(float(request.args.get('d', 0))),
-                "pin": int(request.args.get('p')),
+                "pin": actual_gpio,        # Store the safe GPIO number
+                "pin_name": name_selection, # Helpful for displaying in the UI later
                 "triggered_today": False
             })
+
+
             self._save_alarms()
             return "", 302, {'Location': '/'}
 
@@ -233,15 +259,13 @@ class SmartHomeManager:
 
     def formatted_config(self, device_class, name, unit_of_measurement, value_template):
         data = {}
-        #sen = f"{sensor}{self.sensor_name}"
-        #unit = self.sensor_units.get(sensor.lower(), "")
         data["device_class"] = device_class
         data["name"] = name
         data["unit_of_measurement"] = unit_of_measurement
         data["value_template"] = value_template
         data["state_topic"] = self.mqtt.state_topic
         return json.dumps(data) if data else "{}"
-#Serial.println("CONFIGdevice_class:light,name:Light 3 Binary Sensor,value_template:{{value_json.L3BS}},payload_on:SWITCHlightOn,payload_off:SWITCHlightOff");
+
     async def mqtt_processor_loop(self):
         print("MQTT Processor Task started...")
         while True:
@@ -254,6 +278,30 @@ class SmartHomeManager:
             
             await asyncio.sleep(0.1)
 
+    async def announce_to_home_assistant(self, unit_of_measurement, device_class):
+        base_topic = f"homeassistant/sensor/{g.mac}"
+        
+        for name, info in self.allowed_pins.items():
+            # Sanitize name for the unique_id (e.g., "Water Pump" -> "water_pump")
+            clean_name = name.lower().replace(" ", "_")
+            
+            config_payload = {
+                "name": name,
+                "unique_id": f"esp32_{clean_name}",
+                "state_topic": f"{self.mqtt.state_topic}",
+                "value_template": "{{value_json." + clean_name + "}}",
+                "unit_of_measurement": unit_of_measurement,
+                "device_class": device_class,
+                "device": {
+                    "identifiers": [f"esp32_{g.mac}"],
+                    "name": "ESP32 Smart Hub"
+                }
+            }
+            
+            # Publish to: homeassistant/sensor/84f3eb23ea09/water_pump/config
+            config_topic = f"{base_topic}/{clean_name}/config"
+            self.mqtt.publish(config_topic, json.dumps(config_payload))
+
     async def run(self):
         while not await self.sync_time():
             print("Initial sync failed, retrying...")
@@ -262,7 +310,8 @@ class SmartHomeManager:
         try:
             self.mqtt.connect()
             #self.mqtt.publish("This is good")
-            self.mqtt.publish(self.formatted_config("light", "Light 3 Binary Sensor", "", "{{value_json.L3BS}}"))
+            #self.mqtt.publish(self.formatted_config("light", "Light 3 Binary Sensor", "", "{{value_json.L3BS}}"))
+            asyncio.create_task(await self.announce_to_home_assistant("", "Light"))
             asyncio.create_task(self.mqtt_listener_loop())
             asyncio.create_task(self.mqtt_processor_loop())
         except Exception as e:
