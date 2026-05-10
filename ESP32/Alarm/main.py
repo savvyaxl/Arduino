@@ -1,6 +1,6 @@
 
 import uasyncio as asyncio # type: ignore
-import SmartHomeManager
+from SmartHomeManager import SmartHomeManager
 
 manager = SmartHomeManager()
 try:

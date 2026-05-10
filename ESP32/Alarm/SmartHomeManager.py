@@ -55,10 +55,17 @@ class SmartHomeManager:
                 # ESP32 RTC: (y, m, d, wd, h, m, s, ss)
                 self.rtc.datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
                 print("NTP Sync Successful")
-                await asyncio.sleep(86400) 
+                #await asyncio.sleep(86400) 
+                return True # Tell the caller we are done!
             except:
-                print("NTP Sync Failed, retrying...")
-                await asyncio.sleep(30)
+                print("NTP Sync Failed.")
+                return False
+
+    async def continuous_time_sync(self, sleep_interval=86400):
+        print("Continuous Time Sync Task started...")
+        while True:
+            await asyncio.sleep(sleep_interval)
+            await self.sync_time()
 
     async def _trigger_action(self, alarm):
         p = Pin(alarm['pin'], Pin.OUT)
@@ -73,19 +80,32 @@ class SmartHomeManager:
 
         if action == "on": 
             p.value(1)
-            self.mqtt.publish(f"{name} On at {ts}")
+            try:
+                self.mqtt.publish(f"{name} On at {ts}")
+            except Exception as e:
+                print(f"Error occurred while publishing MQTT message: {e}")
         elif action == "off": 
             p.value(0)
-            self.mqtt.publish(f"{name} Off at {ts}")
+            try:
+                self.mqtt.publish(f"{name} Off at {ts}")
+            except Exception as e:
+                print(f"Error occurred while publishing MQTT message: {e}")
         elif action == "pulse":
             p.value(1)
-            self.mqtt.publish(f"Pulse '{name}' Started at {ts} for {int(alarm['duration'])}")
+            try:
+                self.mqtt.publish(f"Pulse '{name}' Started at {ts} for {int(alarm['duration'])}")
+            except Exception as e:
+                print(f"Error occurred while publishing MQTT message: {e}")
             await asyncio.sleep(int(alarm['duration']))
             p.value(0)
-            self.mqtt.publish(f"Pulse '{name}' Ended at {self.getTime()}")
+            try:
+                self.mqtt.publish(f"Pulse '{name}' Ended at {self.getTime()}")
+            except Exception as e:
+                print(f"Error occurred while publishing MQTT message: {e}")
             print(f"ALARM FINISHED: '{name}' pulse complete.")
 
     async def alarm_checker_loop(self):
+        print("Alarm Checker Task started...")
         while True:
             gc.collect()
             now = self.rtc.datetime()
@@ -197,26 +217,58 @@ class SmartHomeManager:
                 self._save_alarms()
             return "", 302, {'Location': '/'}
 
+    async def mqtt_listener_loop(self):
+        print("MQTT Listener started...")
+        while True:
+            try:
+                # check_msg() is non-blocking in most libraries; 
+                # it just checks the socket buffer once and moves on.
+                self.mqtt.check_msg() 
+            except Exception as e:
+                print(f"MQTT Listener Error: {e}")
+                # Optional: try to reconnect here if the connection dropped
+            
+            # This sleep is CRITICAL to let the Web Server and Alarms run
+            await asyncio.sleep(1) 
+
+    def formatted_config(self, device_class, name, unit_of_measurement, value_template):
+        data = {}
+        #sen = f"{sensor}{self.sensor_name}"
+        #unit = self.sensor_units.get(sensor.lower(), "")
+        data["device_class"] = device_class
+        data["name"] = name
+        data["unit_of_measurement"] = unit_of_measurement
+        data["value_template"] = value_template
+        data["state_topic"] = self.mqtt.state_topic
+        return json.dumps(data) if data else "{}"
+#Serial.println("CONFIGdevice_class:light,name:Light 3 Binary Sensor,value_template:{{value_json.L3BS}},payload_on:SWITCHlightOn,payload_off:SWITCHlightOff");
+    async def mqtt_processor_loop(self):
+        print("MQTT Processor Task started...")
+        while True:
+            if len(self.mqtt.queue) > 0:
+                topic, msg = self.mqtt.queue.popleft()
+                print(f"Processing {topic}: {msg}")
+                
+                if "alarm" in msg:
+                    print(f"Processing alarm command: {msg}")
+            
+            await asyncio.sleep(0.1)
+
     async def run(self):
-        # net_secret = self.get_best_network()
-        # if net_secret:
-        #     from micropython-mqtt.mqtt_as import config, MQTTClient
-        #     config['ssid'] = net_secret['ssid']
-        #     config['wifi_pw'] = net_secret['password']
-        #     config['server'] = net_secret['broker']
-        #     config['port'] = net_secret['port']
-        #     config['user'] = net_secret['user']
-        #     config['password'] = net_secret['pass']
-        #     config['ssl'] = context 
+        while not await self.sync_time():
+            print("Initial sync failed, retrying...")
+            await asyncio.sleep(5)
 
+        try:
+            self.mqtt.connect()
+            #self.mqtt.publish("This is good")
+            self.mqtt.publish(self.formatted_config("light", "Light 3 Binary Sensor", "", "{{value_json.L3BS}}"))
+            asyncio.create_task(self.mqtt_listener_loop())
+            asyncio.create_task(self.mqtt_processor_loop())
+        except Exception as e:
+            print(f"Error occurred while connecting to MQTT: {e}")
 
-        self.mqtt.connect()
-        self.mqtt.publish("This is good")
-
-            # self.mqtt_client = MQTTClient(config)
-            # await self.mqtt_client.connect() # Async connection!
-
-        asyncio.create_task(self.sync_time())
+        asyncio.create_task(self.continuous_time_sync())
         asyncio.create_task(self.alarm_checker_loop())
         print("Server running on port 80...")
         await self.app.start_server(port=80)

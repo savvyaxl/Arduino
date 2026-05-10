@@ -1,11 +1,8 @@
-# This file is executed on every boot (including wake-boot from deepsleep)
-#import esp
-#esp.osdebug(None)
-#import webrepl
-#webrepl.start()
-#import testboard
-#import time
-#time.sleep(1000)
-
+# from SmartHomeManager import SmartHomeManager
 from alex.wifi import WiFiHandler
+import time
+
 WiFiHandler()
+# manager = SmartHomeManager()
+# time.sleep(5) # Wait for WiFi to connect
+# manager.sync_time()

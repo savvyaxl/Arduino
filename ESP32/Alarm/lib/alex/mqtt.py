@@ -3,6 +3,7 @@ from umqtt.simple import MQTTClient
 import globals as g
 import json
 import ssl
+from collections import deque # Or use a simple list
 
 # Create SSL context
 context = None
@@ -46,9 +47,12 @@ class MQTTHandler:
             
             # Add more sensor types and units as needed
         }
+        self.queue = deque((), 10)
 
     def sub_cb(self, topic, msg):
         print(f"Received message from topic '{topic.decode()}': {msg.decode()}")
+        print(f"DEBUG: Adding to queue. Current size: {len(self.queue)}")
+        self.queue.append((topic.decode(), msg.decode()))
 
     def connect(self):
         print(f"Connecting to MQTT broker {g.broker}:{g.mqport}...")
