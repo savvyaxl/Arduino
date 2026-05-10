@@ -1,3 +1,4 @@
+import sys
 import time
 from umqtt.simple import MQTTClient
 import globals as g
@@ -59,10 +60,17 @@ class MQTTHandler:
         try:
             self.client.connect()
             print(f"Connected to MQTT broker at {g.broker}")
-            self.client.subscribe(self.sub_topic)
-            print(f"Subscribed to topic: {self.sub_topic}")
+            # self.client.subscribe(self.sub_topic)
+            # print(f"Subscribed to topic: {self.sub_topic}")
         except OSError as e:
             print(f"Failed to connect or subscribe: {e}")
+
+    def subscribe(self, topic):
+        try:
+            self.client.subscribe(topic)
+            print(f"Subscribed to topic: {topic}")
+        except OSError as e:
+            print(f"Failed to subscribe to topic '{topic}': {e}")
 
     def disconnect(self):
         print(f"Disconnecting from MQTT broker {g.broker}:{g.mqport}...")
@@ -78,29 +86,25 @@ class MQTTHandler:
             print(f"Error during check_msg operation: {e}")
             raise Exception(f"{e}")
 
-    def publish(self, message):
+    def publish(self, topic=None, message=None):
         try:
             if message is None:
                 message = f'Hello from MicroPython at {time.time()}'
-            self.client.publish(self.state_topic, message.encode())
-            print(f"Published message to '{self.state_topic}': {message}")
+            if topic is None:
+                topic = self.state_topic
+            self.client.publish(topic, message.encode())
+            print(f"Published message to '{topic}': {message}")
         except OSError as e:
             print(f"Error during publish operation: {e}")
             raise Exception(f"{e}")
 
-    def publish_config(self):
-            for sensor in self.sensor_data:
-                config_topic = f"homeassistant/sensor/{g.mac}/{sensor}{self.sensor_name}/config"
-                config = self.formatted_config(sensor)
-                self.client.publish(config_topic, config.encode())
-                time.sleep(2)
-
-    def publish_config2(self, config_topic, msg):
+    def publish_config(self, topic, msg):
             try:
-                self.client.publish(config_topic, msg.encode(), retain=True)
-                print(f"Published config to '{config_topic}': {msg}")
+                self.client.publish(topic, msg.encode(), retain=True)
+                print(f"Published config to '{topic}': {msg}")
             except OSError as e:
-                print(f"Error during publish_config2 operation: {e}")
+                func_name = sys._getframe().f_code.co_name 
+                print(f"Error in {func_name} Publishing config to '{topic}': {msg}: {e}")
                 raise Exception(f"{e}")
 
     def formatted_config(self, sensor):

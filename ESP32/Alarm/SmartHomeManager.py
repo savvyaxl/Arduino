@@ -44,6 +44,7 @@ class SmartHomeManager:
                 "payload_off": "OFF",
                 "value_template": "{{{{ value_json.water_pump }}}}"
             }
+
         }
 
     def getTime(self):
@@ -93,6 +94,10 @@ class SmartHomeManager:
         p = Pin(alarm['pin'], Pin.OUT)
         action = alarm.get('action', 'pulse')
         name = alarm.get('name', 'Unnamed Alarm')
+        base_topic = f"homeassistant/sensor/{g.mac}"
+
+        state_topic = f"homeassistant/{alarm['type']}/{g.mac}/state"
+        print(f"{alarm['type']}")
 
         # Get current time for the print statement
         now = self.rtc.datetime()
@@ -103,25 +108,25 @@ class SmartHomeManager:
         if action == "on": 
             p.value(1)
             try:
-                self.mqtt.publish(await self.formatted_message(alarm, "ON"))
+                self.mqtt.publish(state_topic, await self.formatted_message(alarm, "ON"))
             except Exception as e:
                 print(f"Error ON occurred while publishing MQTT message: {e}")
         elif action == "off": 
             p.value(0)
             try:
-                self.mqtt.publish(await self.formatted_message(alarm, "OFF"))
+                self.mqtt.publish(state_topic, await self.formatted_message(alarm, "OFF"))
             except Exception as e:
                 print(f"Error OFF occurred while publishing MQTT message: {e}")
         elif action == "pulse":
             p.value(1)
             try:
-                self.mqtt.publish(await self.formatted_message(alarm, "ON"))
+                self.mqtt.publish(state_topic, await self.formatted_message(alarm, "ON"))
             except Exception as e:
                 print(f"Error PULSE ON occurred while publishing MQTT message: {e}")
             await asyncio.sleep(int(alarm['duration']))
             p.value(0)
             try:
-                self.mqtt.publish(await self.formatted_message(alarm, "OFF"))
+                self.mqtt.publish(state_topic, await self.formatted_message(alarm, "OFF"))
             except Exception as e:
                 print(f"Error PULSE OFF occurred while publishing MQTT message: {e}")
             print(f"ALARM FINISHED: '{name}' pulse complete.")
@@ -239,7 +244,8 @@ class SmartHomeManager:
                 "duration": int(float(request.args.get('d', 0))),
                 "pin": actual_gpio,        # Store the safe GPIO number
                 "pin_name": name_selection, # Helpful for displaying in the UI later
-                "triggered_today": False
+                "triggered_today": False,
+                "type": "switch" if self.allowed_pins[name_selection].get("type") == "switch" else ("binary_sensor" if self.allowed_pins[name_selection].get("type") == "binary_sensor" else "sensor")
             })
 
 
@@ -268,6 +274,12 @@ class SmartHomeManager:
             # This sleep is CRITICAL to let the Web Server and Alarms run
             await asyncio.sleep(1) 
 
+    async def subscribe(self, topic):
+        print("MQTT subscribe started...")
+        self.mqtt.subscribe(topic) 
+        await asyncio.sleep(1) 
+
+
     def formatted_config(self, device_class, name, unit_of_measurement, value_template):
         data = {}
         data["device_class"] = device_class
@@ -288,81 +300,22 @@ class SmartHomeManager:
                     print(f"Processing alarm command: {msg}")
             
             await asyncio.sleep(0.1)
-
-    async def announce_to_home_assistant(self, unit_of_measurement, device_class):
+        
+    async def announce_to_home_assistant(self):
         base_topic = f"homeassistant/sensor/{g.mac}"
-        
-        for name, info in self.allowed_pins.items():
-            # Sanitize name for the unique_id (e.g., "Water Pump" -> "water_pump")
-            clean_name = name.lower().replace(" ", "_")
-            
-            config_payload = {
-                "name": name,
-                "unique_id": f"esp32_{clean_name}",
-                "state_topic": f"{self.mqtt.state_topic}",
-                "value_template": "{{value_json." + clean_name + "}}",
-                "unit_of_measurement": unit_of_measurement,
-                "device_class": device_class,
-                "device": {
-                    "identifiers": [f"esp32_{g.mac}"],
-                    "name": "ESP32 Smart Hub"
-                }
-            }
-            
-            # Publish to: homeassistant/sensor/84f3eb23ea09/water_pump/config
-            config_topic = f"{base_topic}/{clean_name}/config"
-            self.mqtt.publish(config_topic, json.dumps(config_payload))
 
-    async def announce_to_home_assistant(self, unit_of_measurement, device_class):
-        base_topic = f"homeassistant/sensor/{g.mac}"
-        
         for name, info in self.allowed_pins.items():
-            # Sanitize name for the unique_id (e.g., "Water Pump" -> "water_pump")
             clean_name = name.lower().replace(" ", "_")
-            
-            config_payload = {
-                "name": name,
-                "unique_id": f"esp32_{clean_name}",
-                "state_topic": f"{self.mqtt.state_topic}",
-                "value_template": "{{value_json." + clean_name + "}}",
-                "unit_of_measurement": unit_of_measurement,
-                "device_class": device_class,
-                "device": {
-                    "identifiers": [f"esp32_{g.mac}"],
-                    "name": "ESP32 Smart Hub"
-                }
-            }
-            
-            # Publish to: homeassistant/sensor/84f3eb23ea09/water_pump/config
-            config_topic = f"{base_topic}/{clean_name}/config"
-            self.mqtt.publish(config_topic, json.dumps(config_payload))
-        
-    async def announce_to_home_assistant2(self):
-        base_topic = f"homeassistant/sensor/{g.mac}"
-        
-        for name, info in self.allowed_pins.items():
-            # Sanitize name for the unique_id (e.g., "Water Pump" -> "water_pump")
-            clean_name = name.lower().replace(" ", "_")
-
-            # config_payload = {
-            #     "name": name,
-            #     "unique_id": f"esp32_{clean_name}",
-            #     "state_topic": f"{self.mqtt.state_topic}",
-            #     "value_template": "{{value_json." + clean_name + "}}",
-            #     "unit_of_measurement": info.get("unit", ""),
-            #     "device_class": info.get("device_class", ""),
-            #     "device": {
-            #         "identifiers": [f"esp32_{g.mac}"],
-            #         "name": "ESP32 Smart Hub"
-            #     }
-            # }
-
+            if info.get("type") == "switch":
+                base_topic = f"homeassistant/switch/{g.mac}"
+            if info.get("type") == "binary_sensor":
+                base_topic = f"homeassistant/binary_sensor/{g.mac}"
 
             # 1. Start with the mandatory fields
             config_payload = {
                 "name": name,
                 "unique_id": f"esp32_{clean_name}",
-                "state_topic": f"{self.mqtt.state_topic}",
+                "state_topic": f"{base_topic}/state",
                 "value_template": "{{ value_json." + clean_name + " }}",
                 "device": {
                     "identifiers": [f"esp32_{g.mac}"],
@@ -387,7 +340,7 @@ class SmartHomeManager:
 
             # Publish to: homeassistant/sensor/84f3eb23ea09/water_pump/config
             config_topic = f"{base_topic}/{clean_name}/config"
-            self.mqtt.publish_config2(config_topic, json.dumps(config_payload))
+            self.mqtt.publish_config(config_topic, json.dumps(config_payload))
 
     async def run(self):
         while not await self.sync_time():
@@ -396,7 +349,8 @@ class SmartHomeManager:
 
         try:
             self.mqtt.connect()
-            asyncio.create_task(self.announce_to_home_assistant2())
+            asyncio.create_task(self.subscribe(f"homeassistant/switch/{g.mac}/subscribe"))
+            asyncio.create_task(self.announce_to_home_assistant())
             asyncio.create_task(self.mqtt_listener_loop())
             asyncio.create_task(self.mqtt_processor_loop())
         except Exception as e:
