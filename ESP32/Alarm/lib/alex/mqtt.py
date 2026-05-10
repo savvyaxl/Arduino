@@ -95,6 +95,14 @@ class MQTTHandler:
                 self.client.publish(config_topic, config.encode())
                 time.sleep(2)
 
+    def publish_config2(self, config_topic, msg):
+            try:
+                self.client.publish(config_topic, msg.encode(), retain=True)
+                print(f"Published config to '{config_topic}': {msg}")
+            except OSError as e:
+                print(f"Error during publish_config2 operation: {e}")
+                raise Exception(f"{e}")
+
     def formatted_config(self, sensor):
         data = {}
         sen = f"{sensor}{self.sensor_name}"

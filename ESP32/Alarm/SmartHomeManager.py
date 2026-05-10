@@ -18,16 +18,31 @@ class SmartHomeManager:
         self.app = Microdot()
         self._setup_routes()
         self.mqtt = MQTT.MQTTHandler()
+        # self.allowed_pins = {
+        #     "Light": {
+        #         "pin": 15,
+        #         "value": "light_state",
+        #         "value_template": "{{ value_json.light_state }}",
+        #         "unit": "",
+        #         "device_class": "None"
+        #     },
+        #     "Water Pump": {
+        #         "pin": 4,
+        #         "value": "pump_status",
+        #         "value_template": "{{ value_json.pump_status }}",
+        #         "unit": "",
+        #         "device_class": "None"
+        #     }
+        # }
         self.allowed_pins = {
-            "Light": {
-                "pin": 15,
-                "value": "light_state",
-                "value_template": "{{ value_json.light_state }}"
-            },
             "Water Pump": {
+                "type": "switch", # Change domain to switch
                 "pin": 4,
-                "value": "pump_status",
-                "value_template": "{{ value_json.pump_status }}"
+                "state_topic": f"homeassistant/switch/{g.mac}/state",
+                "command_topic": f"homeassistant/switch/{g.mac}/subscribe",
+                "payload_on": "ON",
+                "payload_off": "OFF",
+                "value_template": "{{{{ value_json.water_pump }}}}"
             }
         }
 
@@ -88,31 +103,27 @@ class SmartHomeManager:
         if action == "on": 
             p.value(1)
             try:
-                print(alarm)
                 self.mqtt.publish(await self.formatted_message(alarm, "ON"))
             except Exception as e:
-                print(f"Error occurred while publishing MQTT message: {e}")
+                print(f"Error ON occurred while publishing MQTT message: {e}")
         elif action == "off": 
             p.value(0)
             try:
-                print(alarm)
                 self.mqtt.publish(await self.formatted_message(alarm, "OFF"))
             except Exception as e:
-                print(f"Error occurred while publishing MQTT message: {e}")
+                print(f"Error OFF occurred while publishing MQTT message: {e}")
         elif action == "pulse":
             p.value(1)
             try:
-                print(alarm)
                 self.mqtt.publish(await self.formatted_message(alarm, "ON"))
             except Exception as e:
-                print(f"Error occurred while publishing MQTT message: {e}")
+                print(f"Error PULSE ON occurred while publishing MQTT message: {e}")
             await asyncio.sleep(int(alarm['duration']))
             p.value(0)
             try:
-                print(alarm)
                 self.mqtt.publish(await self.formatted_message(alarm, "OFF"))
             except Exception as e:
-                print(f"Error occurred while publishing MQTT message: {e}")
+                print(f"Error PULSE OFF occurred while publishing MQTT message: {e}")
             print(f"ALARM FINISHED: '{name}' pulse complete.")
 
     async def alarm_checker_loop(self):
@@ -302,6 +313,82 @@ class SmartHomeManager:
             config_topic = f"{base_topic}/{clean_name}/config"
             self.mqtt.publish(config_topic, json.dumps(config_payload))
 
+    async def announce_to_home_assistant(self, unit_of_measurement, device_class):
+        base_topic = f"homeassistant/sensor/{g.mac}"
+        
+        for name, info in self.allowed_pins.items():
+            # Sanitize name for the unique_id (e.g., "Water Pump" -> "water_pump")
+            clean_name = name.lower().replace(" ", "_")
+            
+            config_payload = {
+                "name": name,
+                "unique_id": f"esp32_{clean_name}",
+                "state_topic": f"{self.mqtt.state_topic}",
+                "value_template": "{{value_json." + clean_name + "}}",
+                "unit_of_measurement": unit_of_measurement,
+                "device_class": device_class,
+                "device": {
+                    "identifiers": [f"esp32_{g.mac}"],
+                    "name": "ESP32 Smart Hub"
+                }
+            }
+            
+            # Publish to: homeassistant/sensor/84f3eb23ea09/water_pump/config
+            config_topic = f"{base_topic}/{clean_name}/config"
+            self.mqtt.publish(config_topic, json.dumps(config_payload))
+        
+    async def announce_to_home_assistant2(self):
+        base_topic = f"homeassistant/sensor/{g.mac}"
+        
+        for name, info in self.allowed_pins.items():
+            # Sanitize name for the unique_id (e.g., "Water Pump" -> "water_pump")
+            clean_name = name.lower().replace(" ", "_")
+
+            # config_payload = {
+            #     "name": name,
+            #     "unique_id": f"esp32_{clean_name}",
+            #     "state_topic": f"{self.mqtt.state_topic}",
+            #     "value_template": "{{value_json." + clean_name + "}}",
+            #     "unit_of_measurement": info.get("unit", ""),
+            #     "device_class": info.get("device_class", ""),
+            #     "device": {
+            #         "identifiers": [f"esp32_{g.mac}"],
+            #         "name": "ESP32 Smart Hub"
+            #     }
+            # }
+
+
+            # 1. Start with the mandatory fields
+            config_payload = {
+                "name": name,
+                "unique_id": f"esp32_{clean_name}",
+                "state_topic": f"{self.mqtt.state_topic}",
+                "value_template": "{{ value_json." + clean_name + " }}",
+                "device": {
+                    "identifiers": [f"esp32_{g.mac}"],
+                    "name": "ESP32 Smart Hub"
+                }
+            }
+
+            # 2. Only add optional items if they have a value
+            if info.get("unit"):
+                config_payload["unit_of_measurement"] = info["unit"]
+
+            if info.get("device_class"):
+                config_payload["device_class"] = info["device_class"]
+
+            # 3. If you are adding the Switch functionality we discussed:
+            if info.get("type") == "switch":
+                config_payload["command_topic"] = f"{base_topic}/subscribe"
+                config_payload["payload_on"] = "ON"
+                config_payload["payload_off"] = "OFF"
+
+
+
+            # Publish to: homeassistant/sensor/84f3eb23ea09/water_pump/config
+            config_topic = f"{base_topic}/{clean_name}/config"
+            self.mqtt.publish_config2(config_topic, json.dumps(config_payload))
+
     async def run(self):
         while not await self.sync_time():
             print("Initial sync failed, retrying...")
@@ -309,13 +396,11 @@ class SmartHomeManager:
 
         try:
             self.mqtt.connect()
-            #self.mqtt.publish("This is good")
-            #self.mqtt.publish(self.formatted_config("light", "Light 3 Binary Sensor", "", "{{value_json.L3BS}}"))
-            asyncio.create_task(await self.announce_to_home_assistant("", "Light"))
+            asyncio.create_task(self.announce_to_home_assistant2())
             asyncio.create_task(self.mqtt_listener_loop())
             asyncio.create_task(self.mqtt_processor_loop())
         except Exception as e:
-            print(f"Error occurred while connecting to MQTT: {e}")
+            print(f"Error in run occurred while connecting to MQTT: {e}")
 
         asyncio.create_task(self.continuous_time_sync())
         asyncio.create_task(self.alarm_checker_loop())
