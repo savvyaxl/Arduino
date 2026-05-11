@@ -86,6 +86,14 @@ class MQTTHandler:
             print(f"Error during check_msg operation: {e}")
             raise Exception(f"{e}")
 
+    def on_message_received(self, topic, msg):
+        # Convert bytes to string
+        t = topic.decode()
+        m = msg.decode()
+        
+        print(f"Received {m} on {t}")
+        return m
+    
     def publish(self, topic=None, message=None):
         try:
             if message is None:
