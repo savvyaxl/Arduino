@@ -18,6 +18,7 @@ class SmartHomeManager:
         self.app = Microdot()
         self._setup_routes()
         self.mqtt = MQTT.MQTTHandler()
+        #self.mqtt.client.set_callback(self.handle_mqtt_command)
         # self.allowed_pins = {
         #     "Light": {
         #         "pin": 15,
@@ -35,7 +36,7 @@ class SmartHomeManager:
         #     }
         # }
         self.allowed_pins = {
-            "Water Pump": {
+            "Water Pump 1": {
                 "type": "switch", # Change domain to switch
                 "pin": 4,
                 "state_topic": f"homeassistant/switch/{g.mac}/state",
@@ -43,7 +44,16 @@ class SmartHomeManager:
                 "payload_on": "ON",
                 "payload_off": "OFF",
                 "value_template": "{{{{ value_json.water_pump }}}}"
-            }
+            },
+            "Water Pump 2": {
+                "type": "switch", # Change domain to switch
+                "pin": 6,
+                "state_topic": f"homeassistant/switch/{g.mac}/state",
+                "command_topic": f"homeassistant/switch/{g.mac}/subscribe",
+                "payload_on": "ON",
+                "payload_off": "OFF",
+                "value_template": "{{{{ value_json.water_pump }}}}"
+            },
 
         }
 
@@ -277,17 +287,7 @@ class SmartHomeManager:
     async def subscribe(self, topic):
         print("MQTT subscribe started...")
         self.mqtt.subscribe(topic) 
-        await asyncio.sleep(1) 
-
-
-    def formatted_config(self, device_class, name, unit_of_measurement, value_template):
-        data = {}
-        data["device_class"] = device_class
-        data["name"] = name
-        data["unit_of_measurement"] = unit_of_measurement
-        data["value_template"] = value_template
-        data["state_topic"] = self.mqtt.state_topic
-        return json.dumps(data) if data else "{}"
+        await asyncio.sleep(1)
 
     async def mqtt_processor_loop(self):
         print("MQTT Processor Task started...")
