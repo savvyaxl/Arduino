@@ -309,9 +309,9 @@ class SmartHomeManager:
                     
                     # Check if the message matches a "Turn On" command
                     if msg == config["payload_on"]:
-                        print(f"Turning ON {name} on pin {config['pin']}")
                         p = Pin(config['pin'], Pin.OUT)
-                        # Add your GPIO logic here
+                        print(f"Turning ON {name} on pin {p}")
+                        p.value(1)
                         try:
                             pn = name.replace(" ", "")
                             self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{pn}ON"))
@@ -320,8 +320,8 @@ class SmartHomeManager:
                     
                     # Check if it matches a "Turn Off" command
                     elif msg == config["payload_off"]:
-                        print(f"Turning OFF {name} on pin {config['pin']}")
                         p = Pin(config['pin'], Pin.OUT)
+                        print(f"Turning OFF {name} on pin {p}")
                         p.value(0)
                         try:
                             pn = name.replace(" ", "")
