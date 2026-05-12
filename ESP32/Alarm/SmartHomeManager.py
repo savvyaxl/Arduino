@@ -36,22 +36,22 @@ class SmartHomeManager:
         #     }
         # }
         self.allowed_pins = {
-            "Water Pump 1": {
+            "Water Pump 3": {
                 "type": "switch", # Change domain to switch
                 "pin": 4,
                 "state_topic": f"homeassistant/switch/{g.mac}/state",
                 "command_topic": f"homeassistant/switch/{g.mac}/subscribe",
-                "payload_on": "ON",
-                "payload_off": "OFF",
+                "payload_on": "WaterPump3ON",
+                "payload_off": "WaterPump3OFF",
                 "value_template": "{{{{ value_json.water_pump }}}}"
             },
-            "Water Pump 2": {
+            "Water Pump 4": {
                 "type": "switch", # Change domain to switch
                 "pin": 6,
                 "state_topic": f"homeassistant/switch/{g.mac}/state",
                 "command_topic": f"homeassistant/switch/{g.mac}/subscribe",
-                "payload_on": "ON",
-                "payload_off": "OFF",
+                "payload_on": "WaterPump4ON",
+                "payload_off": "WaterPump4OFF",
                 "value_template": "{{{{ value_json.water_pump }}}}"
             },
 
@@ -100,14 +100,19 @@ class SmartHomeManager:
         data[clean_name] = msg
         return json.dumps(data) if data else "{}"
 
+    async def formatted_homeassistant_message(self, name, msg):
+        clean_name = name.lower().replace(" ", "_")
+        data = {}
+        data[clean_name] = msg
+        return json.dumps(data) if data else "{}"
+
     async def _trigger_action(self, alarm):
         p = Pin(alarm['pin'], Pin.OUT)
         action = alarm.get('action', 'pulse')
         name = alarm.get('name', 'Unnamed Alarm')
         base_topic = f"homeassistant/sensor/{g.mac}"
-
+        pn = alarm.get('pin_name').replace(" ", "")
         state_topic = f"homeassistant/{alarm['type']}/{g.mac}/state"
-        print(f"{alarm['type']}")
 
         # Get current time for the print statement
         now = self.rtc.datetime()
@@ -118,25 +123,25 @@ class SmartHomeManager:
         if action == "on": 
             p.value(1)
             try:
-                self.mqtt.publish(state_topic, await self.formatted_message(alarm, "ON"))
+                self.mqtt.publish(state_topic, await self.formatted_message(alarm, f"{pn}ON"))
             except Exception as e:
                 print(f"Error ON occurred while publishing MQTT message: {e}")
         elif action == "off": 
             p.value(0)
             try:
-                self.mqtt.publish(state_topic, await self.formatted_message(alarm, "OFF"))
+                self.mqtt.publish(state_topic, await self.formatted_message(alarm, f"{pn}OFF"))
             except Exception as e:
                 print(f"Error OFF occurred while publishing MQTT message: {e}")
         elif action == "pulse":
             p.value(1)
             try:
-                self.mqtt.publish(state_topic, await self.formatted_message(alarm, "ON"))
+                self.mqtt.publish(state_topic, await self.formatted_message(alarm, f"{pn}ON"))
             except Exception as e:
                 print(f"Error PULSE ON occurred while publishing MQTT message: {e}")
             await asyncio.sleep(int(alarm['duration']))
             p.value(0)
             try:
-                self.mqtt.publish(state_topic, await self.formatted_message(alarm, "OFF"))
+                self.mqtt.publish(state_topic, await self.formatted_message(alarm, f"{pn}OFF"))
             except Exception as e:
                 print(f"Error PULSE OFF occurred while publishing MQTT message: {e}")
             print(f"ALARM FINISHED: '{name}' pulse complete.")
@@ -255,7 +260,7 @@ class SmartHomeManager:
                 "pin": actual_gpio,        # Store the safe GPIO number
                 "pin_name": name_selection, # Helpful for displaying in the UI later
                 "triggered_today": False,
-                "type": "switch" if self.allowed_pins[name_selection].get("type") == "switch" else ("binary_sensor" if self.allowed_pins[name_selection].get("type") == "binary_sensor" else "sensor")
+                "type": self.allowed_pins[name_selection].get("type")
             })
 
 
@@ -298,7 +303,33 @@ class SmartHomeManager:
                 
                 if "alarm" in msg:
                     print(f"Processing alarm command: {msg}")
-            
+
+                # Iterate through your allowed_pins dictionary
+                for name, config in self.allowed_pins.items():
+                    
+                    # Check if the message matches a "Turn On" command
+                    if msg == config["payload_on"]:
+                        print(f"Turning ON {name} on pin {config['pin']}")
+                        p = Pin(config['pin'], Pin.OUT)
+                        # Add your GPIO logic here
+                        try:
+                            pn = name.replace(" ", "")
+                            self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{pn}ON"))
+                        except Exception as e:
+                            print(f"Error ON occurred while publishing MQTT message: {e}")
+                    
+                    # Check if it matches a "Turn Off" command
+                    elif msg == config["payload_off"]:
+                        print(f"Turning OFF {name} on pin {config['pin']}")
+                        p = Pin(config['pin'], Pin.OUT)
+                        p.value(0)
+                        try:
+                            pn = name.replace(" ", "")
+                            self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{pn}OFF"))
+                        except Exception as e:
+                            print(f"Error OFF occurred while publishing MQTT message: {e}")
+
+
             await asyncio.sleep(0.1)
         
     async def announce_to_home_assistant(self):
@@ -333,8 +364,8 @@ class SmartHomeManager:
             # 3. If you are adding the Switch functionality we discussed:
             if info.get("type") == "switch":
                 config_payload["command_topic"] = f"{base_topic}/subscribe"
-                config_payload["payload_on"] = "ON"
-                config_payload["payload_off"] = "OFF"
+                config_payload["payload_on"] = info["payload_on"]
+                config_payload["payload_off"] = info["payload_off"] 
 
 
 
