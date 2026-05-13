@@ -16,47 +16,10 @@ class SmartHomeManager:
         self.rtc = RTC()
         self.offset = utc_offset * 3600
         self.alarms = self._load_alarms()
+        self.allowed_pins = self._load_pin_definitions()
         self.app = Microdot()
         self._setup_routes()
         self.mqtt = MQTT.MQTTHandler()
-        #self.mqtt.client.set_callback(self.handle_mqtt_command)
-        # self.allowed_pins = {
-        #     "Light": {
-        #         "pin": 15,
-        #         "value": "light_state",
-        #         "value_template": "{{ value_json.light_state }}",
-        #         "unit": "",
-        #         "device_class": "None"
-        #     },
-        #     "Water Pump": {
-        #         "pin": 4,
-        #         "value": "pump_status",
-        #         "value_template": "{{ value_json.pump_status }}",
-        #         "unit": "",
-        #         "device_class": "None"
-        #     }
-        # }
-        self.allowed_pins = {
-            "Water Pump 3": {
-                "type": "switch", # Change domain to switch
-                "pin": 4,
-                "state_topic": f"homeassistant/switch/{g.mac}/state",
-                "command_topic": f"homeassistant/switch/{g.mac}/subscribe",
-                "payload_on": "WaterPump3ON",
-                "payload_off": "WaterPump3OFF",
-                "value_template": "{{{{ value_json.water_pump }}}}"
-            },
-            "Water Pump 4": {
-                "type": "switch", # Change domain to switch
-                "pin": 6,
-                "state_topic": f"homeassistant/switch/{g.mac}/state",
-                "command_topic": f"homeassistant/switch/{g.mac}/subscribe",
-                "payload_on": "WaterPump4ON",
-                "payload_off": "WaterPump4OFF",
-                "value_template": "{{{{ value_json.water_pump }}}}"
-            },
-
-        }
 
     def getTime(self):
         dt = self.rtc.datetime()
@@ -72,6 +35,13 @@ class SmartHomeManager:
     def _save_alarms(self):
         with open(self.STORAGE_FILE, "w") as f:
             json.dump(self.alarms, f)
+
+    def _load_pin_definitions(self):
+        try:
+            with open(self.PINDEF_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return {}
 
     def _save_pin_definitions(self):
         with open(self.PINDEF_FILE, "w") as f:
