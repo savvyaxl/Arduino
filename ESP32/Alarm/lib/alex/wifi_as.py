@@ -77,7 +77,7 @@ class WiFiHandler:
                 print(f"Wi-Fi write error: {e}")
             
             # Non-blocking async loop keeps context execution moving cleanly
-            timeout = 15
+            timeout = 500
             while not self.wlan.isconnected() and timeout > 0:
                 print('.', end='')
                 await asyncio.sleep(1)  # <-- Yields execution control back to alarm loop

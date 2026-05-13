@@ -9,6 +9,7 @@ import globals as g
 
 class SmartHomeManager:
     STORAGE_FILE = "alarms.json"
+    PINDEF_FILE = "pin_definitions.json"
     DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
     def __init__(self, utc_offset=-3):
@@ -71,6 +72,10 @@ class SmartHomeManager:
     def _save_alarms(self):
         with open(self.STORAGE_FILE, "w") as f:
             json.dump(self.alarms, f)
+
+    def _save_pin_definitions(self):
+        with open(self.PINDEF_FILE, "w") as f:
+            json.dump(self.allowed_pins, f)
 
     async def sync_time(self):
         while True:
