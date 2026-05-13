@@ -51,7 +51,6 @@ class WiFiHandler:
             for secret in secrets:
                 if self.ssid == secret['ssid']:
                     print("="*48)
-                    # print("{:<30} {:<10} {:<8}".format(self.ssid, self.channel, self.rssi))
                     g.myssid = secret['ssid']
                     g.mypass = secret['password']
                     g.broker = secret['broker']
@@ -62,8 +61,12 @@ class WiFiHandler:
 
     def connect_to_wifi(self, ssid, password):
         if not self.wlan.isconnected():
-            print("Connecting to network..." , "{:<30}".format(self.ssid))
-            self.wlan.connect(ssid, password)
+            try:
+                self.wlan.disconnect()  # Ensure we're disconnected before trying to connect
+                print("Connecting to network..." , "{:<30}".format(self.ssid))
+                self.wlan.connect(ssid, password)
+            except Exception as e:
+                print(f"Error occurred while trying to connect to Wi-Fi: {e}")
             # Wait for the connection to be established
             timeout = 10  # 10-second timeout
             while not self.wlan.isconnected() and timeout > 0:

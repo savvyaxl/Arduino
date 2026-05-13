@@ -1,5 +1,5 @@
 import uasyncio as asyncio # type: ignore
-import json, ntptime, time, os # type: ignore
+import json, ntptime, time, os, ds1302 # type: ignore
 from machine import RTC, Pin # type: ignore
 from microdot.microdot import Microdot
 import gc, network # type: ignore
@@ -74,15 +74,28 @@ class SmartHomeManager:
 
     async def sync_time(self):
         while True:
+            gc.collect()
             try:
-                gc.collect()
+                ds = ds1302.DS1302(clk=Pin(1), dio=Pin(2), cs=Pin(3))
+            except:
+                print("Failed to initialize DS1302")
+
+            try:
+                t = ds.date_time()
+                self.rtc.datetime((t[0], t[1], t[2], t[3], t[4], t[5], t[6], 0))
+                print(f"Clock synced successfully! {t[0]}-{t[1]:02d}-{t[2]:02d} {t[4]:02d}:{t[5]:02d}:{t[6]:02d}")
+            except:
+                print("RTC Sync failed - check wiring!")
+
+            try:
                 ntptime.settime()
                 t = time.time() + self.offset
                 tm = time.localtime(t)
                 # ESP32 RTC: (y, m, d, wd, h, m, s, ss)
                 self.rtc.datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
-                print("NTP Sync Successful")
-                #await asyncio.sleep(86400) 
+                print(self.getTime())
+                ds.date_time((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5]))
+                print(f"NTP Sync Successful {tm[0]}-{tm[1]:02d}-{tm[2]:02d} {tm[3]:02d}:{tm[4]:02d}:{tm[5]:02d}")
                 return True # Tell the caller we are done!
             except:
                 print("NTP Sync Failed.")
@@ -371,12 +384,18 @@ class SmartHomeManager:
 
             # Publish to: homeassistant/sensor/84f3eb23ea09/water_pump/config
             config_topic = f"{base_topic}/{clean_name}/config"
-            self.mqtt.publish_config(config_topic, json.dumps(config_payload))
+            try:
+                self.mqtt.publish_config(config_topic, json.dumps(config_payload))
+                print(f"Published Home Assistant config for {name} to {config_topic}")
+            except Exception as e:
+                print(f"Error occurred while publishing MQTT config for {name}: {e}")
 
     async def run(self):
-        while not await self.sync_time():
+        count = 0
+        while not await self.sync_time() and count < 5:  # Try syncing time up to 5 times
             print("Initial sync failed, retrying...")
-            await asyncio.sleep(5)
+            await asyncio.sleep(1)
+            count += 1
 
         try:
             self.mqtt.connect()
