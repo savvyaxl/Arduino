@@ -93,7 +93,6 @@ class SmartHomeManager:
                 tm = time.localtime(t)
                 # ESP32 RTC: (y, m, d, wd, h, m, s, ss)
                 self.rtc.datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
-                print(self.getTime())
                 ds.date_time((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5]))
                 print(f"NTP Sync Successful {tm[0]}-{tm[1]:02d}-{tm[2]:02d} {tm[3]:02d}:{tm[4]:02d}:{tm[5]:02d}")
                 return True # Tell the caller we are done!
