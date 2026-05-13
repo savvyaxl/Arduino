@@ -2,7 +2,7 @@ import network # pyright: ignore[reportMissingImports]
 from mysecrets import secrets
 import globals as g
 import time
-import uasyncio as asyncio  # pyright: ignore[reportMissingImports] Added for non-blocking recovery loops
+import uasyncio as asyncio  # pyright: ignore[reportMissingImports]
 
 class WiFiHandler:
     def __init__(self):
@@ -11,48 +11,50 @@ class WiFiHandler:
         
         self.disconnect_wifi()
         self.scan_wifi()
-        # Initial boot connection remains blocking intentionally to establish core state
+        # Fast 3-second initial block on cold boot to quickly step into the main event loop
         self.connect_to_wifi_blocking(g.myssid, g.mypass)
 
     def scan_wifi(self):
         try:
             scan_results = self.wlan.scan()
         except Exception:
-            return  # Prevent crash if hardware driver is busy mid-reboot
+            return  # Prevent crashes if network chip interface is busy during a router reboot
 
         print("{:<30} {:<10} {:<8}".format("SSID", "Channel", "RSSI"))
         print("="*48)
+        
+        matched_secret = None
         for net in scan_results:
             try:
-                ssid = net[0].decode()
+                ssid_bytes = net[0]
+                if not ssid_bytes:
+                    continue
+                ssid = ssid_bytes.decode('utf-8')
                 channel = net[2]
                 rssi = net[3]
                 print("{:<30} {:<10} {:<8}".format(ssid, channel, rssi))
+                
+                # Check for a matching credentials profile in secrets
+                if not matched_secret:
+                    for secret in secrets:
+                        if ssid == secret['ssid']:
+                            matched_secret = secret
             except Exception:
                 continue
             
-        doBreak = False
-        for net in scan_results:
-            if doBreak:
-                break            
-            try:
-                self.ssid = net[0].decode()
-                for secret in secrets:
-                    if self.ssid == secret['ssid']:
-                        print("="*48)
-                        g.myssid = secret['ssid']
-                        g.mypass = secret['password']
-                        g.broker = secret['broker']
-                        g.mqport = secret['port']
-                        g.mquser = secret['user']
-                        g.mqpass = secret['pass']
-                        doBreak = True
-            except Exception:
-                continue
+        if matched_secret:
+            print("="*48)
+            print(f"Target network profile selected: {matched_secret['ssid']}")
+            g.myssid = matched_secret['ssid']
+            g.mypass = matched_secret['password']
+            g.broker = matched_secret['broker']
+            g.mqport = matched_secret['port']
+            g.mquser = matched_secret['user']
+            g.mqpass = matched_secret['pass']
 
     def connect_to_wifi_blocking(self, ssid, password):
-        """Used strictly on initial cold boot setup."""
-        if not self.wlan.isconnected():
+        """Initial boot step connection framework."""
+        if not self.wlan.isconnected() and ssid:
             try:
                 self.wlan.disconnect()
                 self.wlan.connect(ssid, password)
@@ -65,20 +67,20 @@ class WiFiHandler:
         self._verify_connection_state()
 
     async def connect_to_wifi_async(self, ssid, password):
-        """Asynchronous connection implementation ensuring background alarms can fire."""
-        if not self.wlan.isconnected():
+        """Asynchronous execution pathway ensuring local alarms can fire uninterrupted."""
+        if not self.wlan.isconnected() and ssid:
             try:
                 self.wlan.disconnect()
-                print(f"Connecting asynchronously to: {ssid}")
+                print(f"\nConnecting asynchronously to: {ssid}")
                 self.wlan.connect(ssid, password)
             except Exception as e:
                 print(f"Wi-Fi write error: {e}")
             
-            # Non-blocking 15-second loop allows alarms to breathe
+            # Non-blocking async loop keeps context execution moving cleanly
             timeout = 15
             while not self.wlan.isconnected() and timeout > 0:
                 print('.', end='')
-                await asyncio.sleep(1)  # <-- Keeps alarms running safely
+                await asyncio.sleep(1)  # <-- Yields execution control back to alarm loop
                 timeout -= 1
 
         self._verify_connection_state()
@@ -94,11 +96,14 @@ class WiFiHandler:
 
     def disconnect_wifi(self):
         if self.wlan.isconnected():
-            self.wlan.disconnect()
-            print("Disconnected from Wi-Fi.")
+            try:
+                self.wlan.disconnect()
+                print("Disconnected from Wi-Fi.")
+            except Exception:
+                pass
 
     async def reconnect_wifi_async(self):
-        """Non-blocking execution pathway optimized for router reboots."""
+        """Non-blocking background pipeline tailored for unexpected router reboots."""
         self.disconnect_wifi()
         await asyncio.sleep(1)
         self.scan_wifi()
