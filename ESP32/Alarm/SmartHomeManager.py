@@ -86,7 +86,7 @@ class SmartHomeManager:
                 print(f"Clock synced successfully! {t[0]}-{t[1]:02d}-{t[2]:02d} {t[4]:02d}:{t[5]:02d}:{t[6]:02d}")
             except:
                 print("RTC Sync failed - check wiring!")
-
+            
             try:
                 ntptime.settime()
                 t = time.time() + self.offset
