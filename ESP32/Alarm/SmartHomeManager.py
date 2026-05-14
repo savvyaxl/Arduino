@@ -21,7 +21,7 @@ class SmartHomeManager:
         self.app = Microdot()
         self._setup_routes()
         self.mqtt = MQTT.MQTTHandler()
-        self.wifi = WiFi.WiFiHandler()
+
     def getTime(self):
         dt = self.rtc.datetime()
         return f"{dt[0]}-{dt[1]:02d}-{dt[2]:02d} {dt[4]:02d}:{dt[5]:02d}:{dt[6]:02d}"
@@ -284,16 +284,15 @@ class SmartHomeManager:
                 print(f"System link down for {TIMEOUT_SEC} secs. Running passive network recovery...")
                 
                 try:
-                    wlan = network.WLAN(network.STA_IF)
                     
                     # Step A: Reconnect Wi-Fi asynchronously if the router dropped
-                    if not wlan.isconnected():
+                    if not WiFi.wlan.isconnected():
                         print("Router link down. Starting background Wi-Fi recovery...")
                         await self.wifi.reconnect_wifi_async()
                         gc.collect()
 
                     # Step B: Rebuild MQTT architecture if Wi-Fi interface is valid
-                    if wlan.isconnected():
+                    if WiFi.wlan.isconnected():
                         print("Wi-Fi network confirmed. Restoring MQTT client context...")
                         try:
                             self.mqtt.disconnect()
@@ -323,7 +322,7 @@ class SmartHomeManager:
 
     async def connect_mqtt_async(self):
         """Encapsulates synchronous connect script blocks inside non-blocking routines."""
-        self.mqtt.reconnect_wifi_async()
+        await WiFi.reconnect_wifi_async()
         await asyncio.sleep_ms(10)
 
 
