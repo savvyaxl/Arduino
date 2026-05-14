@@ -106,3 +106,6 @@ class WiFiHandler:
         """Non-blocking background pipeline tailored for unexpected router reboots."""
         self.scan_wifi()
         await self.connect_to_wifi_async(g.myssid, g.mypass)
+
+    def isconnected(self):
+        return self.wlan.isconnected()   

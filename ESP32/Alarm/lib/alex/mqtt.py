@@ -109,7 +109,7 @@ class MQTTHandler:
     def publish_config(self, topic, msg):
             try:
                 self.client.publish(topic, msg.encode(), retain=True)
-                print(f"Published config to '{topic}': {msg}")
+                #print(f"Published config to '{topic}': {msg}")
             except OSError as e:
                 func_name = sys._getframe().f_code.co_name 
                 print(f"Error in {func_name} Publishing config to '{topic}': {msg}: {e}")

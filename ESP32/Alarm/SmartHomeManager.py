@@ -266,7 +266,7 @@ class SmartHomeManager:
     async def mqtt_listener_loop(self):
         print("MQTT Listener started...")
         last_healthy_time = time.time()
-        TIMEOUT_SEC = 900  # Passive 900 second gate timer baseline
+        TIMEOUT_SEC = 30  # Passive 900 second gate timer baseline
 
         while True:
             try:
@@ -286,13 +286,13 @@ class SmartHomeManager:
                 try:
                     
                     # Step A: Reconnect Wi-Fi asynchronously if the router dropped
-                    if not WiFi.wlan.isconnected():
+                    if not WiFi.isconnected():
                         print("Router link down. Starting background Wi-Fi recovery...")
                         await self.wifi.reconnect_wifi_async()
                         gc.collect()
 
                     # Step B: Rebuild MQTT architecture if Wi-Fi interface is valid
-                    if WiFi.wlan.isconnected():
+                    if WiFi.isconnected():
                         print("Wi-Fi network confirmed. Restoring MQTT client context...")
                         try:
                             self.mqtt.disconnect()
