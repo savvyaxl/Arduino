@@ -1,11 +1,20 @@
 {
-"Water Pump 4": {
-"type": "switch", 
-"state_topic": "homeassistant/switch/84f703eac47c/state", 
-"pin": 6, 
-"payload_on": "WaterPump4ON", 
-"payload_off": "WaterPump4OFF", 
-"value_template": "{{{{ value_json.water_pump }}}}", 
-"command_topic": "homeassistant/switch/84f703eac47c/subscribe"
-}, 
-"Water Pump 3": {"type": "switch", "state_topic": "homeassistant/switch/84f703eac47c/state", "pin": 4, "payload_on": "WaterPump3ON", "payload_off": "WaterPump3OFF", "value_template": "{{{{ value_json.water_pump }}}}", "command_topic": "homeassistant/switch/84f703eac47c/subscribe"}}
+    "Water Pump 4": {
+        "type": "switch",
+        "state_topic": "homeassistant/switch/84f703eac47c/state",
+        "pin": 6,
+        "payload_on": "WaterPump4ON",
+        "payload_off": "WaterPump4OFF",
+        "value_template": "{{{{ value_json.water_pump }}}}",
+        "command_topic": "homeassistant/switch/84f703eac47c/subscribe"
+    },
+    "Water Pump 3": {
+        "type": "switch",
+        "state_topic": "homeassistant/switch/84f703eac47c/state",
+        "pin": 4,
+        "payload_on": "WaterPump3ON",
+        "payload_off": "WaterPump3OFF",
+        "value_template": "{{{{ value_json.water_pump }}}}",
+        "command_topic": "homeassistant/switch/84f703eac47c/subscribe"
+    }
+}

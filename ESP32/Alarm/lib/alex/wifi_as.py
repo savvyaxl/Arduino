@@ -60,7 +60,7 @@ class WiFiHandler:
                 self.wlan.connect(ssid, password)
             except Exception:
                 pass
-            timeout = 3
+            timeout = 5
             while not self.wlan.isconnected() and timeout > 0:
                 time.sleep(1)
                 timeout -= 1
@@ -74,10 +74,10 @@ class WiFiHandler:
                 print(f"\nConnecting asynchronously to: {ssid}")
                 self.wlan.connect(ssid, password)
             except Exception as e:
-                print(f"Wi-Fi write error: {e}")
+                print(f"Wi-Fi connect_to_wifi_async error: {e}")
             
             # Non-blocking async loop keeps context execution moving cleanly
-            timeout = 500
+            timeout = 5
             while not self.wlan.isconnected() and timeout > 0:
                 print('.', end='')
                 await asyncio.sleep(1)  # <-- Yields execution control back to alarm loop
@@ -104,7 +104,5 @@ class WiFiHandler:
 
     async def reconnect_wifi_async(self):
         """Non-blocking background pipeline tailored for unexpected router reboots."""
-        self.disconnect_wifi()
-        await asyncio.sleep(1)
         self.scan_wifi()
         await self.connect_to_wifi_async(g.myssid, g.mypass)

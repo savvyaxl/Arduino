@@ -5,6 +5,7 @@ from microdot.microdot import Microdot
 import gc, network # type: ignore
 from mysecrets import secrets
 import alex.mqtt as MQTT
+import alex.wifi_as as WiFi
 import globals as g
 
 class SmartHomeManager:
@@ -20,7 +21,7 @@ class SmartHomeManager:
         self.app = Microdot()
         self._setup_routes()
         self.mqtt = MQTT.MQTTHandler()
-
+        self.wifi = WiFi.WiFiHandler()
     def getTime(self):
         dt = self.rtc.datetime()
         return f"{dt[0]}-{dt[1]:02d}-{dt[2]:02d} {dt[4]:02d}:{dt[5]:02d}:{dt[6]:02d}"
@@ -264,17 +265,67 @@ class SmartHomeManager:
 
     async def mqtt_listener_loop(self):
         print("MQTT Listener started...")
+        last_healthy_time = time.time()
+        TIMEOUT_SEC = 900  # Passive 900 second gate timer baseline
+
         while True:
             try:
                 # check_msg() is non-blocking in most libraries; 
                 # it just checks the socket buffer once and moves on.
-                self.mqtt.check_msg() 
+                self.mqtt.check_msg()
+                last_healthy_time = time.time()
             except Exception as e:
                 print(f"MQTT Listener Error: {e}")
-                # Optional: try to reconnect here if the connection dropped
-            
             # This sleep is CRITICAL to let the Web Server and Alarms run
             await asyncio.sleep(1) 
+
+            # 2. Evaluate if network or MQTT connection has been dead for 15 minutes
+            if (time.time() - last_healthy_time) > TIMEOUT_SEC:
+                print(f"System link down for {TIMEOUT_SEC} secs. Running passive network recovery...")
+                
+                try:
+                    wlan = network.WLAN(network.STA_IF)
+                    
+                    # Step A: Reconnect Wi-Fi asynchronously if the router dropped
+                    if not wlan.isconnected():
+                        print("Router link down. Starting background Wi-Fi recovery...")
+                        await self.wifi.reconnect_wifi_async()
+                        gc.collect()
+
+                    # Step B: Rebuild MQTT architecture if Wi-Fi interface is valid
+                    if wlan.isconnected():
+                        print("Wi-Fi network confirmed. Restoring MQTT client context...")
+                        try:
+                            self.mqtt.disconnect()
+                        except Exception:
+                            pass
+                        gc.collect()
+
+                        # Sharp timeout limits connection block window to protect local actions
+                        await asyncio.wait_for(self.connect_mqtt_async(), timeout=15)
+                        
+                        # Re-establish broker state configurations
+                        await self.subscribe(f"homeassistant/switch/{g.mac}/subscribe")
+                        await self.announce_to_home_assistant()
+                        print("Network communication pipeline completely restored.")
+                    else:
+                        print("Router infrastructure still down. Local tasks operating natively...")
+                        
+                except Exception as recovery_error:
+                    print(f"Recovery cycle deferred: {recovery_error}")
+                    gc.collect()
+
+                # Advance baseline pointer to maintain non-aggressive spacing between checks
+                last_healthy_time = time.time()
+
+            # Essential yield step keeps the Web Server and Alarm loops completely unblocked
+            await asyncio.sleep(1)
+
+    async def connect_mqtt_async(self):
+        """Encapsulates synchronous connect script blocks inside non-blocking routines."""
+        self.mqtt.reconnect_wifi_async()
+        await asyncio.sleep_ms(10)
+
 
     async def subscribe(self, topic):
         print("MQTT subscribe started...")
@@ -366,7 +417,7 @@ class SmartHomeManager:
 
     async def run(self):
         count = 0
-        while not await self.sync_time() and count < 5:  # Try syncing time up to 5 times
+        while not await self.sync_time() and count < 1:  # Try syncing time up to 2 times
             print("Initial sync failed, retrying...")
             await asyncio.sleep(1)
             count += 1
