@@ -5,7 +5,7 @@ from microdot.microdot import Microdot
 import gc, network # type: ignore
 from mysecrets import secrets
 import alex.mqtt as MQTT
-import alex.wifi_as as WiFi
+import alex.wifi_as as WIFI
 import globals as g
 
 class SmartHomeManager:
@@ -20,7 +20,10 @@ class SmartHomeManager:
         self.allowed_pins = self._load_pin_definitions()
         self.app = Microdot()
         self._setup_routes()
+        # self.wifi = WIFI.WiFiHandler()
+        # time.sleep(2)  
         self.mqtt = MQTT.MQTTHandler()
+        self.subscribed = False
 
     def getTime(self):
         dt = self.rtc.datetime()
@@ -78,6 +81,12 @@ class SmartHomeManager:
 
     async def continuous_time_sync(self, sleep_interval=86400):
         print("Continuous Time Sync Task started...")
+        while True:
+            await asyncio.sleep(sleep_interval)
+            await self.sync_time()
+
+    async def continuous_subscribe(self, sleep_interval=100):
+        print("Continuous subscribe Task started...")
         while True:
             await asyncio.sleep(sleep_interval)
             await self.sync_time()
@@ -282,36 +291,39 @@ class SmartHomeManager:
             # 2. Evaluate if network or MQTT connection has been dead for 15 minutes
             if (time.time() - last_healthy_time) > TIMEOUT_SEC:
                 print(f"System link down for {TIMEOUT_SEC} secs. Running passive network recovery...")
-                
                 try:
-                    
+                    sta_if = network.WLAN(network.STA_IF)
                     # Step A: Reconnect Wi-Fi asynchronously if the router dropped
-                    if not WiFi.isconnected():
+                    if not sta_if.isconnected():
                         print("Router link down. Starting background Wi-Fi recovery...")
-                        await self.wifi.reconnect_wifi_async()
+                        await WIFI.reconnect_wifi_async()
                         gc.collect()
 
                     # Step B: Rebuild MQTT architecture if Wi-Fi interface is valid
-                    if WiFi.isconnected():
+                    if sta_if.isconnected():
                         print("Wi-Fi network confirmed. Restoring MQTT client context...")
+                        mac = ''.join(['%02x' % b for b in sta_if.config('mac')])
                         try:
+                            await WIFI.reconnect_wifi_async()
                             self.mqtt.disconnect()
                         except Exception:
                             pass
                         gc.collect()
-
                         # Sharp timeout limits connection block window to protect local actions
                         await asyncio.wait_for(self.connect_mqtt_async(), timeout=15)
-                        
-                        # Re-establish broker state configurations
-                        await self.subscribe(f"homeassistant/switch/{g.mac}/subscribe")
-                        await self.announce_to_home_assistant()
-                        print("Network communication pipeline completely restored.")
+                        # # Re-establish broker state configurations
+                        # await asyncio.sleep(20)
+                        # try:
+                        #     await self.announce_to_home_assistant(mac)
+                        # except:
+                        #     print("failed to announce_to_home_assistant")
+                        print("Network communication pipeline not completely restored.")
                     else:
                         print("Router infrastructure still down. Local tasks operating natively...")
                         
                 except Exception as recovery_error:
                     print(f"Recovery cycle deferred: {recovery_error}")
+                    retry_subscribe = True
                     gc.collect()
 
                 # Advance baseline pointer to maintain non-aggressive spacing between checks
@@ -322,7 +334,7 @@ class SmartHomeManager:
 
     async def connect_mqtt_async(self):
         """Encapsulates synchronous connect script blocks inside non-blocking routines."""
-        await WiFi.reconnect_wifi_async()
+        await self.mqtt.connect()
         await asyncio.sleep_ms(10)
 
 
@@ -369,15 +381,16 @@ class SmartHomeManager:
 
             await asyncio.sleep(0.1)
         
-    async def announce_to_home_assistant(self):
-        base_topic = f"homeassistant/sensor/{g.mac}"
+    async def announce_to_home_assistant(self,mac):
+        base_topic = f"homeassistant/sensor/{mac}"
 
+        count = 0
         for name, info in self.allowed_pins.items():
             clean_name = name.lower().replace(" ", "_")
             if info.get("type") == "switch":
-                base_topic = f"homeassistant/switch/{g.mac}"
+                base_topic = f"homeassistant/switch/{mac}"
             if info.get("type") == "binary_sensor":
-                base_topic = f"homeassistant/binary_sensor/{g.mac}"
+                base_topic = f"homeassistant/binary_sensor/{mac}"
 
             # 1. Start with the mandatory fields
             config_payload = {
@@ -386,7 +399,7 @@ class SmartHomeManager:
                 "state_topic": f"{base_topic}/state",
                 "value_template": "{{ value_json." + clean_name + " }}",
                 "device": {
-                    "identifiers": [f"esp32_{g.mac}"],
+                    "identifiers": [f"esp32_{mac}"],
                     "name": "ESP32 Smart Hub"
                 }
             }
@@ -409,6 +422,9 @@ class SmartHomeManager:
             # Publish to: homeassistant/sensor/84f3eb23ea09/water_pump/config
             config_topic = f"{base_topic}/{clean_name}/config"
             try:
+                if count == 0:
+                    asyncio.create_task(self.subscribe(f"{base_topic}/subscribe"))
+                count = 1
                 self.mqtt.publish_config(config_topic, json.dumps(config_payload))
                 print(f"Published Home Assistant config for {name} to {config_topic}")
             except Exception as e:
@@ -423,12 +439,16 @@ class SmartHomeManager:
 
         try:
             self.mqtt.connect()
-            asyncio.create_task(self.subscribe(f"homeassistant/switch/{g.mac}/subscribe"))
-            asyncio.create_task(self.announce_to_home_assistant())
+        except Exception as e:
+            print(f"Error in run occurred while connecting to MQTT: {e}")
+
+        try:
+            #asyncio.create_task(self.subscribe(f"homeassistant/switch/{g.mac}/subscribe"))
+            asyncio.create_task(self.announce_to_home_assistant(g.mac))
             asyncio.create_task(self.mqtt_listener_loop())
             asyncio.create_task(self.mqtt_processor_loop())
         except Exception as e:
-            print(f"Error in run occurred while connecting to MQTT: {e}")
+            print(f"Error in run subscribe, publish in MQTT: {e}")
 
         asyncio.create_task(self.continuous_time_sync())
         asyncio.create_task(self.alarm_checker_loop())

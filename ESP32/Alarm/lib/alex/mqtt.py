@@ -58,6 +58,7 @@ class MQTTHandler:
     def connect(self):
         print(f"Connecting to MQTT broker {g.broker}:{g.mqport}...")
         try:
+            #print(g.print_all())
             self.client.connect()
             print(f"Connected to MQTT broker at {g.broker}")
             # self.client.subscribe(self.sub_topic)

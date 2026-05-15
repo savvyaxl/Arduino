@@ -3,18 +3,32 @@
         "type": "switch",
         "state_topic": "homeassistant/switch/84f703eac47c/state",
         "pin": 6,
+        "when_on": 1,
         "payload_on": "WaterPump4ON",
-        "payload_off": "WaterPump4OFF",
-        "value_template": "{{{{ value_json.water_pump }}}}",
-        "command_topic": "homeassistant/switch/84f703eac47c/subscribe"
+        "payload_off": "WaterPump4OFF"
     },
     "Water Pump 3": {
         "type": "switch",
         "state_topic": "homeassistant/switch/84f703eac47c/state",
         "pin": 4,
+        "when_on": 1,
         "payload_on": "WaterPump3ON",
-        "payload_off": "WaterPump3OFF",
-        "value_template": "{{{{ value_json.water_pump }}}}",
-        "command_topic": "homeassistant/switch/84f703eac47c/subscribe"
+        "payload_off": "WaterPump3OFF"
+    },
+    "Tomato Light 4": {
+        "type": "switch",
+        "state_topic": "homeassistant/switch/84f703eac47c/state",
+        "pin": 5,
+        "when_on": 1,
+        "payload_on": "TomatoLight4ON",
+        "payload_off": "TomatoLight4OFF"
+    },
+    "Tomato Light 3": {
+        "type": "switch",
+        "state_topic": "homeassistant/switch/84f703eac47c/state",
+        "pin": 7,
+        "when_on": 1,
+        "payload_on": "TomatoLight3ON",
+        "payload_off": "TomatoLight3OFF"
     }
 }
