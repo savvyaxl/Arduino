@@ -118,25 +118,29 @@ class SmartHomeManager:
         print(f"ALARM TRIGGERED: '{name}' at {ts} | Action: {action.upper()}")
 
         if action == "on": 
-            p.value(1)
+            on_value = 0 if alarm.get("active_low") == 1 else 1
+            p.value(on_value)                        
             try:
                 self.mqtt.publish(state_topic, await self.formatted_message(alarm, f"{pn}ON"))
             except Exception as e:
                 print(f"Error ON occurred while publishing MQTT message: {e}")
         elif action == "off": 
-            p.value(0)
+            off_value = 1 if alarm.get("active_low") == 1 else 0
+            p.value(off_value)                        
             try:
                 self.mqtt.publish(state_topic, await self.formatted_message(alarm, f"{pn}OFF"))
             except Exception as e:
                 print(f"Error OFF occurred while publishing MQTT message: {e}")
         elif action == "pulse":
-            p.value(1)
+            on_value = 0 if alarm.get("active_low") == 1 else 1
+            p.value(on_value)                        
             try:
                 self.mqtt.publish(state_topic, await self.formatted_message(alarm, f"{pn}ON"))
             except Exception as e:
                 print(f"Error PULSE ON occurred while publishing MQTT message: {e}")
             await asyncio.sleep(int(alarm['duration']))
-            p.value(0)
+            off_value = 1 if alarm.get("active_low") == 1 else 0
+            p.value(off_value)                        
             try:
                 self.mqtt.publish(state_topic, await self.formatted_message(alarm, f"{pn}OFF"))
             except Exception as e:
@@ -197,9 +201,22 @@ class SmartHomeManager:
                 </style>
                 <script>
                     function toggleDays(source) {{
-                        checkboxes = document.getElementsByClassName('day-check');
+                        var checkboxes = document.getElementsByClassName('day-check');
                         for(var i=0; i<checkboxes.length; i++) checkboxes[i].checked = source.checked;
                     }}
+                    
+                    function updateAlarmName(selectEl) {{
+                        var nameInput = document.getElementById('alarm-name');
+                        if (selectEl.selectedIndex >= 0) {{
+                            nameInput.value = selectEl.options[selectEl.selectedIndex].text;
+                        }}
+                    }}
+                    
+                    // Run once on load to populate the initial dropdown value
+                    window.addEventListener('DOMContentLoaded', function() {{
+                        var devSelect = document.getElementById('dev-select');
+                        if (devSelect) updateAlarmName(devSelect);
+                    }});
                 </script>
             </head>
             <body>
@@ -212,9 +229,9 @@ class SmartHomeManager:
                 <ul>{rows if rows else "<li>No alarms set</li>"}</ul>
                 <hr>
                 <form action="/add">
-                    Alarm Name: <input type="text" name="n" value="Alarm">
+                    Alarm Name: <input type="text" name="n" id="alarm-name" value="Alarm">
                     Time: <input type="time" name="t" required>
-                    Device: <select name="pn">
+                    Device: <select name="pn" id="dev-select" onchange="updateAlarmName(this)">
                         {pin_options}
                     </select>
                     Action: <select name="a">
@@ -257,8 +274,10 @@ class SmartHomeManager:
                 "pin": actual_gpio,        # Store the safe GPIO number
                 "pin_name": name_selection, # Helpful for displaying in the UI later
                 "triggered_today": False,
-                "type": self.allowed_pins[name_selection].get("type")
+                "type": self.allowed_pins[name_selection].get("type"),
+                "active_low": self.allowed_pins[name_selection].get("active_low")
             })
+
 
 
             self._save_alarms()
@@ -360,7 +379,8 @@ class SmartHomeManager:
                     if msg == config["payload_on"]:
                         p = Pin(config['pin'], Pin.OUT)
                         print(f"Turning ON {name} on pin {p}")
-                        p.value(1)
+                        on_value = 0 if config.get("active_low") == 1 else 1
+                        p.value(on_value)                        
                         try:
                             pn = name.replace(" ", "")
                             self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{pn}ON"))
@@ -371,7 +391,8 @@ class SmartHomeManager:
                     elif msg == config["payload_off"]:
                         p = Pin(config['pin'], Pin.OUT)
                         print(f"Turning OFF {name} on pin {p}")
-                        p.value(0)
+                        off_value = 1 if config.get("active_low") == 1 else 0
+                        p.value(off_value)
                         try:
                             pn = name.replace(" ", "")
                             self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{pn}OFF"))

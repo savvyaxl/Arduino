@@ -3,7 +3,7 @@
         "type": "switch",
         "state_topic": "homeassistant/switch/84f703eac47c/state",
         "pin": 6,
-        "when_on": 1,
+        "active_low": 1,
         "payload_on": "WaterPump4ON",
         "payload_off": "WaterPump4OFF"
     },
@@ -11,7 +11,7 @@
         "type": "switch",
         "state_topic": "homeassistant/switch/84f703eac47c/state",
         "pin": 4,
-        "when_on": 1,
+        "active_low": 1,
         "payload_on": "WaterPump3ON",
         "payload_off": "WaterPump3OFF"
     },
@@ -19,16 +19,16 @@
         "type": "switch",
         "state_topic": "homeassistant/switch/84f703eac47c/state",
         "pin": 5,
-        "when_on": 1,
+        "active_low": 1,
         "payload_on": "TomatoLight4ON",
         "payload_off": "TomatoLight4OFF"
     },
-    "Tomato Light 3": {
+    "Tomato Fan 4": {
         "type": "switch",
         "state_topic": "homeassistant/switch/84f703eac47c/state",
         "pin": 7,
-        "when_on": 1,
-        "payload_on": "TomatoLight3ON",
-        "payload_off": "TomatoLight3OFF"
+        "active_low": 1,
+        "payload_on": "TomatoFan4ON",
+        "payload_off": "TomatoFan4OFF"
     }
 }
