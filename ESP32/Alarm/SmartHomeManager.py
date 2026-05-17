@@ -24,6 +24,7 @@ class SmartHomeManager:
         # time.sleep(2)  
         self.mqtt = MQTT.MQTTHandler()
         self.subscribed = False
+        self.subscribe_topic = None
 
     def getTime(self):
         dt = self.rtc.datetime()
@@ -85,11 +86,11 @@ class SmartHomeManager:
             await asyncio.sleep(sleep_interval)
             await self.sync_time()
 
-    async def continuous_subscribe(self, sleep_interval=100):
+    async def continuous_subscribe(self, sleep_interval=2000):
         print("Continuous subscribe Task started...")
         while True:
             await asyncio.sleep(sleep_interval)
-            await self.sync_time()
+            await self.subscribe(self.subscribe_topic)
 
     async def formatted_message(self, alarm, msg):
         clean_name = alarm['pin_name'].lower().replace(" ", "_")
@@ -439,12 +440,13 @@ class SmartHomeManager:
                 config_payload["payload_off"] = info["payload_off"] 
 
 
-
+            self.subscribe_topic = f"{base_topic}/subscribe"
             # Publish to: homeassistant/sensor/84f3eb23ea09/water_pump/config
             config_topic = f"{base_topic}/{clean_name}/config"
             try:
                 if count == 0:
                     asyncio.create_task(self.subscribe(f"{base_topic}/subscribe"))
+                    asyncio.create_task(self.continuous_subscribe())
                 count = 1
                 self.mqtt.publish_config(config_topic, json.dumps(config_payload))
                 print(f"Published Home Assistant config for {name} to {config_topic}")
