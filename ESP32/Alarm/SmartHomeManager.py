@@ -20,8 +20,6 @@ class SmartHomeManager:
         self.allowed_pins = self._load_pin_definitions()
         self.app = Microdot()
         self._setup_routes()
-        # self.wifi = WIFI.WiFiHandler()
-        # time.sleep(2)  
         self.mqtt = MQTT.MQTTHandler()
         self.subscribed = False
         self.subscribe_topic = None
@@ -62,8 +60,12 @@ class SmartHomeManager:
 
             try:
                 t = ds.date_time()
-                self.rtc.datetime((t[0], t[1], t[2], t[3], t[4], t[5], t[6], 0))
-                print(f"Clock synced successfully! {t[0]}-{t[1]:02d}-{t[2]:02d} {t[4]:02d}:{t[5]:02d}:{t[6]:02d}")
+                if t[0] == 2165 or t[1] == 165:
+                    print("No RTC attached - check wiring!")
+                else:
+                    self.rtc.datetime((t[0], t[1], t[2], t[3], t[4], t[5], t[6], 0))
+                    print(f"Clock synced successfully! {t[0]}-{t[1]:02d}-{t[2]:02d} {t[4]:02d}:{t[5]:02d}:{t[6]:02d}")
+
             except:
                 print("RTC Sync failed - check wiring!")
             
@@ -377,26 +379,25 @@ class SmartHomeManager:
                 for name, config in self.allowed_pins.items():
                     
                     # Check if the message matches a "Turn On" command
-                    if msg == config["payload_on"]:
+                    payload = name.replace(" ", "")
+                    if msg == f"{payload}ON":          
                         p = Pin(config['pin'], Pin.OUT)
                         print(f"Turning ON {name} on pin {p}")
                         on_value = 0 if config.get("active_low") == 1 else 1
                         p.value(on_value)                        
                         try:
-                            pn = name.replace(" ", "")
-                            self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{pn}ON"))
+                            self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{payload}ON"))
                         except Exception as e:
                             print(f"Error ON occurred while publishing MQTT message: {e}")
                     
                     # Check if it matches a "Turn Off" command
-                    elif msg == config["payload_off"]:
+                    elif msg == f"{payload}OFF":
                         p = Pin(config['pin'], Pin.OUT)
                         print(f"Turning OFF {name} on pin {p}")
                         off_value = 1 if config.get("active_low") == 1 else 0
                         p.value(off_value)
                         try:
-                            pn = name.replace(" ", "")
-                            self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{pn}OFF"))
+                            self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{payload}OFF"))
                         except Exception as e:
                             print(f"Error OFF occurred while publishing MQTT message: {e}")
 
@@ -409,6 +410,7 @@ class SmartHomeManager:
         count = 0
         for name, info in self.allowed_pins.items():
             clean_name = name.lower().replace(" ", "_")
+            payload = name.replace(" ", "")
             if info.get("type") == "switch":
                 base_topic = f"homeassistant/switch/{mac}"
             if info.get("type") == "binary_sensor":
@@ -436,8 +438,8 @@ class SmartHomeManager:
             # 3. If you are adding the Switch functionality we discussed:
             if info.get("type") == "switch":
                 config_payload["command_topic"] = f"{base_topic}/subscribe"
-                config_payload["payload_on"] = info["payload_on"]
-                config_payload["payload_off"] = info["payload_off"] 
+                config_payload["payload_on"] = f"{payload}ON"
+                config_payload["payload_off"] = f"{payload}OFF"
 
 
             self.subscribe_topic = f"{base_topic}/subscribe"

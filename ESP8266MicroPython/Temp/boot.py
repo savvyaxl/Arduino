@@ -1,6 +1,5 @@
 # from SmartHomeManager import SmartHomeManager
 from alex.wifi import WiFiHandler
-import time
 
 WiFiHandler()
 # manager = SmartHomeManager()
