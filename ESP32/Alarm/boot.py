@@ -1,8 +1,8 @@
 # from SmartHomeManager import SmartHomeManager
-from alex.wifi import WiFiHandler
+from alex.wifi_as import WiFiHandler
 import time
 
-WiFiHandler()
+WiFiHandler("esp32-alarm")
 # manager = SmartHomeManager()
 # time.sleep(5) # Wait for WiFi to connect
 # manager.sync_time()

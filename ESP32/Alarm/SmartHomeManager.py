@@ -167,6 +167,13 @@ class SmartHomeManager:
             await asyncio.sleep(10)
 
     def _setup_routes(self):
+        @self.app.route('/get-time')
+        async def get_time(request):
+            now = self.rtc.datetime()
+            current_time_str = f"{now[0]}-{now[1]:02d}-{now[2]:02d} {now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
+            current_day = self.DAY_NAMES[now[3]]
+            return f"{current_day} {current_time_str}", 200, {'Content-Type': 'text/plain; charset=utf-8'}
+
         @self.app.route('/')
         async def index(request):
             now = self.rtc.datetime()
@@ -189,6 +196,7 @@ class SmartHomeManager:
             html = f"""
             <html>
             <head>
+                <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <style>
                     body {{ font-family: sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }}
@@ -294,6 +302,59 @@ class SmartHomeManager:
                 self._save_alarms()
             return "", 302, {'Location': '/'}
 
+
+        # --- ROUTE 1: Display the Web Form ---
+        @self.app.route('/config', methods=['GET'])
+        async def show_config(request):
+            json_content = self.allowed_pins
+            
+            html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>ESP32 Pin Config</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <style>
+                    body {{ font-family: sans-serif; margin: 20px; background: #222; color: #fff; }}
+                    textarea {{ width: 100%; height: 400px; font-family: monospace; background: #111; color: #a6e22e; border: 1px solid #444; padding: 10px; box-sizing: border-box; }}
+                    .btn {{ display: inline-block; background: #28a745; color: white; border: none; padding: 10px 20px; text-decoration: none; cursor: pointer; margin-top: 10px; font-size: 16px; border-radius: 4px; }}
+                    .btn-home {{ background: #007bff; margin-left: 10px; }}
+                    .actions {{ margin-top: 15px; }}
+                </style>
+            </head>
+            <body>
+                <h2>Edit Hardware Configuration</h2>
+                <form method="POST" action="/config">
+                    <textarea name="json_data">{json_content}</textarea>
+                    <div class="actions">
+                        <input type="submit" class="btn" value="Save Changes">
+                        <a href="/" class="btn btn-home">Return Home</a>
+                    </div>
+                </form>
+            </body>
+            </html>
+            """
+            return html, 200, {'Content-Type': 'text/html'}
+
+        # --- ROUTE 2: Handle Save, Reload Variable, and Show Options ---
+        @self.app.route('/config', methods=['POST'])
+        async def save_config(request):
+            global my_runtime_variable  # Reference your main configuration variable
+            raw_json = request.form.get('json_data', '{}').replace("'", '"')
+            
+            try:
+                # Validate JSON format
+                json.loads(raw_json)
+                # 1. Save to the file system
+                self._save_pin_definitions()
+                # 2. Update the live variable in memory instantly
+                self.allowed_pins = raw_json
+                print("Config updated live in memory!")
+                return "", 302, {'Location': '/config'}
+
+            except ValueError as e:
+                return f"<h3>JSON Syntax Error! Config not saved.</h3><p>{str(e)}</p><a href='/config'>Go Back</a>"
+
     async def mqtt_listener_loop(self):
         print("MQTT Listener started...")
         last_healthy_time = time.time()
@@ -380,13 +441,15 @@ class SmartHomeManager:
                     
                     # Check if the message matches a "Turn On" command
                     payload = name.replace(" ", "")
+                    print(f"payload: {payload}")
+                    print(f"msg: {msg}")
                     if msg == f"{payload}ON":          
                         p = Pin(config['pin'], Pin.OUT)
                         print(f"Turning ON {name} on pin {p}")
                         on_value = 0 if config.get("active_low") == 1 else 1
                         p.value(on_value)                        
                         try:
-                            self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{payload}ON"))
+                            self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{msg}"))
                         except Exception as e:
                             print(f"Error ON occurred while publishing MQTT message: {e}")
                     
@@ -397,7 +460,7 @@ class SmartHomeManager:
                         off_value = 1 if config.get("active_low") == 1 else 0
                         p.value(off_value)
                         try:
-                            self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{payload}OFF"))
+                            self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{msg}"))
                         except Exception as e:
                             print(f"Error OFF occurred while publishing MQTT message: {e}")
 

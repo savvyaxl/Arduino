@@ -5,8 +5,10 @@ import time
 import uasyncio as asyncio  # pyright: ignore[reportMissingImports]
 
 class WiFiHandler:
-    def __init__(self):
+    def __init__(self, hostname="ESP32-Alarm"):
+        self.hostname = hostname
         self.wlan = network.WLAN(network.STA_IF)
+        self.wlan.config(hostname=self.hostname)
         self.wlan.active(True)
         
         self.disconnect_wifi()
@@ -90,7 +92,7 @@ class WiFiHandler:
             g.mac = ''.join(['%02x' % b for b in self.wlan.config('mac')])
             g.ip = self.wlan.ifconfig()[0]
             print('\nConnected Successfully!')
-            print('Network IP Address:', g.ip, 'mac:', g.mac)
+            print('Network IP Address:', g.ip, f"URL http://{g.ip}", 'mac:', g.mac)
         else:
             print('\nConnection cycle failed.')
 
