@@ -209,6 +209,8 @@ class SmartHomeManager:
                     .btn {{ background: #03dac6; color: black; border: none; padding: 12px; width: 100%; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 10px; }}
                     .del {{ color: #cf6679; text-decoration: none; float: right; font-weight: bold; }}
                     hr {{ border: 0; border-top: 1px solid #333; margin: 20px 0; }}
+                    .refresh-controls {{ margin-top: 8px; font-size: 14px; color: #aaa; }}
+                    .refresh-controls button {{ background: none; border: none; color: #03dac6; cursor: pointer; font-size: 14px; text-decoration: underline; padding: 0; }}
                 </style>
                 <script>
                     function toggleDays(source) {{
@@ -223,17 +225,54 @@ class SmartHomeManager:
                         }}
                     }}
                     
-                    // Run once on load to populate the initial dropdown value
+                    // --- Auto-Refresh Application Logic ---
+                    let timerInstance = null;
+
+                    async function fetchLiveTime() {{
+                        try {{
+                            let res = await fetch('/get-time');
+                            if (res.ok) {{
+                                let txt = await res.text();
+                                document.getElementById('live-clock').innerText = txt;
+                            }}
+                        }} catch (err) {{
+                            console.log("Clock sync failure", err);
+                        }}
+                    }}
+
+                    function manageAutoRefresh() {{
+                        const checkbox = document.getElementById('auto-refresh-toggle');
+                        if (checkbox.checked) {{
+                            if (!timerInstance) {{
+                                timerInstance = setInterval(fetchLiveTime, 1000);
+                            }}
+                        }} else {{
+                            clearInterval(timerInstance);
+                            timerInstance = null;
+                        }}
+                    }}
+                    
                     window.addEventListener('DOMContentLoaded', function() {{
                         var devSelect = document.getElementById('dev-select');
                         if (devSelect) updateAlarmName(devSelect);
+                        
+                        // Initialize auto-refresh when the DOM finishes rendering
+                        manageAutoRefresh();
                     }});
                 </script>
             </head>
             <body>
                 <div class="time-display">
-                    <h3>{current_day} {current_time_str}</h3>
-                    <small><a href="/" style="color:#03dac6; text-decoration:none;">↻ Refresh Time</a></small>
+                    <!-- Added distinct targeting ID here -->
+                    <h3 id="live-clock">{current_day} {current_time_str}</h3>
+                    
+                    <div class="refresh-controls">
+                        <button onclick="fetchLiveTime()">↻ Refresh Time</button>
+                        <span style="margin: 0 10px;">|</span>
+                        <label>
+                            <input type="checkbox" id="auto-refresh-toggle" checked onchange="manageAutoRefresh()"> Auto-Refresh (1s)
+                        </label>
+                    </div>
                 </div>
 
                 <h2>Active Alarms</h2>
@@ -261,8 +300,8 @@ class SmartHomeManager:
             </body>
             </html>
             """
-            return html, 200, {'Content-Type': 'text/html'}
-
+            return html, 200, {'Content-Type': 'text/html; charset=utf-8'}
+        
         @self.app.route('/add')
         async def add(request):
             t_parts = request.args.get('t').split(':')
