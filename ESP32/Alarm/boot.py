@@ -1,5 +1,5 @@
 # from SmartHomeManager import SmartHomeManager
-from alex.wifi_as import WiFiHandler
+from wifi_as import WiFiHandler
 import time
 
 WiFiHandler("esp32-alarm")

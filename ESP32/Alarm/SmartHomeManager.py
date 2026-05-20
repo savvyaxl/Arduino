@@ -4,8 +4,8 @@ from machine import RTC, Pin # type: ignore
 from microdot.microdot import Microdot
 import gc, network # type: ignore
 from mysecrets import secrets
-import alex.mqtt as MQTT
-import alex.wifi_as as WIFI
+import mqtt as MQTT
+import wifi_as as WIFI
 import globals as g
 
 class SmartHomeManager:
@@ -296,6 +296,7 @@ class SmartHomeManager:
                         {day_boxes}
                     </div>
                     <input type="submit" class="btn" value="Save Alarm">
+                    <a href="/config" class="btn">Config</a>
                 </form>
             </body>
             </html>

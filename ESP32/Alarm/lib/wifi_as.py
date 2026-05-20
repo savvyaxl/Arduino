@@ -8,7 +8,7 @@ class WiFiHandler:
     def __init__(self, hostname="ESP32-Alarm"):
         self.hostname = hostname
         self.wlan = network.WLAN(network.STA_IF)
-        self.wlan.config(hostname=self.hostname)
+        #self.wlan.config(hostname=self.hostname)
         self.wlan.active(True)
         
         self.disconnect_wifi()
