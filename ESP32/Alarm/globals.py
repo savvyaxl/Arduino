@@ -8,6 +8,8 @@ mquser = None
 mqpass = None
 mac = None
 ip = None
+topic_subscribe = None
+
 
 
 def format_time2(t):

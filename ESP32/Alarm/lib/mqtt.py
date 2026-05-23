@@ -51,8 +51,8 @@ class MQTTHandler:
         self.queue = deque((), 10)
 
     def sub_cb(self, topic, msg):
-        print(f"Received message from topic '{topic.decode()}': {msg.decode()}")
-        print(f"DEBUG: Adding to queue. Current size: {len(self.queue)}")
+        # print(f"Received message from topic '{topic.decode()}': {msg.decode()}")
+        # print(f"DEBUG: Adding to queue. Current size: {len(self.queue)}")
         self.queue.append((topic.decode(), msg.decode()))
 
     def connect(self):
@@ -63,13 +63,15 @@ class MQTTHandler:
             print(f"Connected to MQTT broker at {g.broker}")
             # self.client.subscribe(self.sub_topic)
             # print(f"Subscribed to topic: {self.sub_topic}")
+            return True
         except OSError as e:
             print(f"Failed to connect or subscribe: {e}")
+            return False
 
     def subscribe(self, topic):
         try:
             self.client.subscribe(topic)
-            print(f"Subscribed to topic: {topic}")
+            print(f"Subscribed to topic: {topic}")            
         except OSError as e:
             print(f"Failed to subscribe to topic '{topic}': {e}")
 

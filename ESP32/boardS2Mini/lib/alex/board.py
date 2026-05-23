@@ -1,7 +1,7 @@
 # board.py – LOLIN S2 Mini (ESP32-S2FN4R2)
 # Full GPIO aliasing + preconfigured buses for MicroPython
 
-import machine # type: ignore
+import machine, time # type: ignore
 
 # Pin dictionary based on full board mapping
 pins = {
@@ -15,11 +15,11 @@ pins = {
     "GND": None,
 
     # GPIO aliases
-    # "IO1": machine.Pin(1),
-    # "IO2": machine.Pin(2),
-    "IO3": machine.Pin(3),
-    "IO4": machine.Pin(4),
-    "IO5": machine.Pin(5),
+    "IO1": machine.Pin(1),
+    "IO2": machine.Pin(2),
+    # "IO3": machine.Pin(3),
+    # "IO4": machine.Pin(4),
+    # "IO5": machine.Pin(5),
     # "IO6": machine.Pin(6),
     # "IO7": machine.Pin(7),
     # "IO8": machine.Pin(8),
@@ -57,27 +57,62 @@ pins = {
     # "TX": machine.Pin(43),
     # "RX": machine.Pin(44),
 }
+class Tester:
+    # Attribute-style access (e.g., board.IO1)
+    def __getattr__(name):
+        if name in pins:
+            return pins[name]
+        raise AttributeError(f"No such pin: {name}")
 
-# Attribute-style access (e.g., board.IO1)
-def __getattr__(name):
-    if name in pins:
-        return pins[name]
-    raise AttributeError(f"No such pin: {name}")
+    # Preconfigured I2C bus
+    def I2C(id=0, freq=400000):
+        return machine.I2C(id, scl=pins["SCL"], sda=pins["SDA"], freq=freq)
 
-# Preconfigured I2C bus
-def I2C(id=0, freq=400000):
-    return machine.I2C(id, scl=pins["SCL"], sda=pins["SDA"], freq=freq)
+    # Preconfigured SPI bus
+    def SPI(id=1, baudrate=1000000, polarity=0, phase=0):
+        return machine.SPI(id,
+                        baudrate=baudrate,
+                        polarity=polarity,
+                        phase=phase,
+                        sck=pins["SCK"],
+                        mosi=pins["MOSI"],
+                        miso=pins["MISO"])
 
-# Preconfigured SPI bus
-def SPI(id=1, baudrate=1000000, polarity=0, phase=0):
-    return machine.SPI(id,
-                       baudrate=baudrate,
-                       polarity=polarity,
-                       phase=phase,
-                       sck=pins["SCK"],
-                       mosi=pins["MOSI"],
-                       miso=pins["MISO"])
+    # Preconfigured UART bus
+    def UART(id=1, baudrate=115200):
+        return machine.UART(id, baudrate=baudrate, tx=pins["TX"], rx=pins["RX"])
 
-# Preconfigured UART bus
-def UART(id=1, baudrate=115200):
-    return machine.UART(id, baudrate=baudrate, tx=pins["TX"], rx=pins["RX"])
+    def safe_pin_test():
+        print("--- Starting Pin Safety Test ---")
+        
+        # Filter only Pin objects from your board dictionary
+        for name, pin_obj in pins.items():
+            if not isinstance(pin_obj, machine.Pin):
+                continue
+                
+            try:
+                # Attempt to set the pin as an output
+                print(f"Testing {name}...", end=" ")
+                pin_obj.init(mode=machine.Pin.OUT)
+                
+                # Toggle it briefly
+                pin_obj.value(1)
+                time.sleep(0.1)
+                pin_obj.value(0)
+                
+                print("OK")
+                
+            except Exception as e:
+                # Catch and report any errors (e.g., ValueError for invalid pins)
+                print(f"FAILED: {e}")
+
+        print("--- Test Complete ---")
+
+
+# --- 3. Entry Point ---
+if __name__ == "__main__":
+    tester = Tester()
+    try:
+        tester.safe_pin_test()
+    except KeyboardInterrupt:
+        pass

@@ -1,5 +1,5 @@
 import uasyncio as asyncio # type: ignore
-import json, ntptime, time, os, ds1302 # type: ignore
+import json, ntptime, time, ds1302 # type: ignore
 from machine import RTC, Pin # type: ignore
 from microdot.microdot import Microdot
 import gc, network # type: ignore
@@ -23,6 +23,7 @@ class SmartHomeManager:
         self.mqtt = MQTT.MQTTHandler()
         self.subscribed = False
         self.subscribe_topic = None
+        self.connect_topic = None
 
     def getTime(self):
         dt = self.rtc.datetime()
@@ -88,11 +89,23 @@ class SmartHomeManager:
             await asyncio.sleep(sleep_interval)
             await self.sync_time()
 
-    async def continuous_subscribe(self, sleep_interval=2000):
+    async def continuous_subscribe(self, sleep_interval=30):
         print("Continuous subscribe Task started...")
         while True:
             await asyncio.sleep(sleep_interval)
-            await self.subscribe(self.subscribe_topic)
+            try:
+                if self.subscribe_topic:
+                    await self.subscribe(self.subscribe_topic)
+                    # return True
+            except Exception as e:
+                print(f"Error occurred while subscribing: {e}")
+                # return False
+
+    async def continuous_publish_config(self, config_topic, config_payload, sleep_interval=30):
+        print("Continuous Publish Config Task started...")
+        while True:
+            await asyncio.sleep(sleep_interval)
+            self.mqtt.publish_config(config_topic, json.dumps(config_payload))
 
     async def formatted_message(self, alarm, msg):
         clean_name = alarm['pin_name'].lower().replace(" ", "_")
@@ -428,19 +441,23 @@ class SmartHomeManager:
                         mac = ''.join(['%02x' % b for b in sta_if.config('mac')])
                         try:
                             await WIFI.reconnect_wifi_async()
+                            print("disconnecting frm MQTT...")
                             self.mqtt.disconnect()
                         except Exception:
                             pass
                         gc.collect()
                         # Sharp timeout limits connection block window to protect local actions
+                        # print("Restoring MQTT connection...")
                         await asyncio.wait_for(self.connect_mqtt_async(), timeout=15)
-                        # # Re-establish broker state configurations
-                        # await asyncio.sleep(20)
+                        # Re-establish broker state configurations
+                        # await asyncio.sleep(15)
+                        # print("Re-establishing MQTT subscription...")
+                        await asyncio.wait_for(self.subscribe(self.subscribe_topic), timeout=15)
                         # try:
                         #     await self.announce_to_home_assistant(mac)
                         # except:
                         #     print("failed to announce_to_home_assistant")
-                        print("Network communication pipeline not completely restored.")
+                        print("Network communication pipeline completely restored.")
                     else:
                         print("Router infrastructure still down. Local tasks operating natively...")
                         
@@ -457,12 +474,17 @@ class SmartHomeManager:
 
     async def connect_mqtt_async(self):
         """Encapsulates synchronous connect script blocks inside non-blocking routines."""
-        await self.mqtt.connect()
+        try:
+            await self.mqtt.connect()
+            return True
+        except Exception as e:
+            print(f"Error occurred connect_mqtt_async: {e}")
         await asyncio.sleep_ms(10)
+        return False
 
 
     async def subscribe(self, topic):
-        print("MQTT subscribe started...")
+        print(f"MQTT subscribe started...{topic}")
         self.mqtt.subscribe(topic) 
         await asyncio.sleep(1)
 
@@ -478,11 +500,8 @@ class SmartHomeManager:
 
                 # Iterate through your allowed_pins dictionary
                 for name, config in self.allowed_pins.items():
-                    
                     # Check if the message matches a "Turn On" command
                     payload = name.replace(" ", "")
-                    print(f"payload: {payload}")
-                    print(f"msg: {msg}")
                     if msg == f"{payload}ON":          
                         p = Pin(config['pin'], Pin.OUT)
                         print(f"Turning ON {name} on pin {p}")
@@ -508,16 +527,12 @@ class SmartHomeManager:
             await asyncio.sleep(0.1)
         
     async def announce_to_home_assistant(self,mac):
-        base_topic = f"homeassistant/sensor/{mac}"
-
         count = 0
         for name, info in self.allowed_pins.items():
             clean_name = name.lower().replace(" ", "_")
             payload = name.replace(" ", "")
-            if info.get("type") == "switch":
-                base_topic = f"homeassistant/switch/{mac}"
-            if info.get("type") == "binary_sensor":
-                base_topic = f"homeassistant/binary_sensor/{mac}"
+            type = info.get("type", "sensor")
+            base_topic = f"homeassistant/{type}/{mac}"
 
             # 1. Start with the mandatory fields
             config_payload = {
@@ -546,21 +561,27 @@ class SmartHomeManager:
 
 
             self.subscribe_topic = f"{base_topic}/subscribe"
+            # self.connect_topic = f"{base_topic}/connect"
             # Publish to: homeassistant/sensor/84f3eb23ea09/water_pump/config
             config_topic = f"{base_topic}/{clean_name}/config"
+            self.allowed_pins[name]["state_topic"] = config_payload["state_topic"]
+            self.allowed_pins[name]["config_topic"] = config_topic
             try:
                 if count == 0:
-                    asyncio.create_task(self.subscribe(f"{base_topic}/subscribe"))
-                    asyncio.create_task(self.continuous_subscribe())
+                    asyncio.create_task(self.subscribe(f"{self.subscribe_topic}"))
+                    # asyncio.create_task(self.mqtt.publish_config(self.connect_topic, self.getTime()))
+                    # self.mqtt.publish(config_payload["state_topic"], self.getTime())
+                    # asyncio.create_task(self.continuous_subscribe(3600))
                 count = 1
                 self.mqtt.publish_config(config_topic, json.dumps(config_payload))
+                # asyncio.create_task(self.continuous_publish_config(config_topic, config_payload, 900))
                 print(f"Published Home Assistant config for {name} to {config_topic}")
             except Exception as e:
                 print(f"Error occurred while publishing MQTT config for {name}: {e}")
 
     async def run(self):
         count = 0
-        while not await self.sync_time() and count < 1:  # Try syncing time up to 2 times
+        while not await self.sync_time() and count < 5:  # Try syncing time up to 5 times
             print("Initial sync failed, retrying...")
             await asyncio.sleep(1)
             count += 1

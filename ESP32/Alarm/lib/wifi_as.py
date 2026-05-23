@@ -54,7 +54,7 @@ class WiFiHandler:
             g.mquser = matched_secret['user']
             g.mqpass = matched_secret['pass']
 
-    def connect_to_wifi_blocking(self, ssid, password):
+    def connect_to_wifi_blocking(self, ssid, password, timeout = 5):
         """Initial boot step connection framework."""
         if not self.wlan.isconnected() and ssid:
             try:
@@ -62,7 +62,6 @@ class WiFiHandler:
                 self.wlan.connect(ssid, password)
             except Exception:
                 pass
-            timeout = 5
             while not self.wlan.isconnected() and timeout > 0:
                 time.sleep(1)
                 timeout -= 1
