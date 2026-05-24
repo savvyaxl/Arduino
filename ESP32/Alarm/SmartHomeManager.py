@@ -123,7 +123,6 @@ class SmartHomeManager:
         p = Pin(alarm['pin'], Pin.OUT)
         action = alarm.get('action', 'pulse')
         name = alarm.get('name', 'Unnamed Alarm')
-        base_topic = f"homeassistant/sensor/{g.mac}"
         pn = alarm.get('pin_name').replace(" ", "")
         state_topic = f"homeassistant/{alarm['type']}/{g.mac}/state"
 
@@ -411,7 +410,7 @@ class SmartHomeManager:
     async def mqtt_listener_loop(self):
         print("MQTT Listener started...")
         last_healthy_time = time.time()
-        TIMEOUT_SEC = 30  # Passive 900 second gate timer baseline
+        TIMEOUT_SEC = 30  # Passive 30 second gate timer baseline
 
         while True:
             try:
@@ -438,7 +437,6 @@ class SmartHomeManager:
                     # Step B: Rebuild MQTT architecture if Wi-Fi interface is valid
                     if sta_if.isconnected():
                         print("Wi-Fi network confirmed. Restoring MQTT client context...")
-                        mac = ''.join(['%02x' % b for b in sta_if.config('mac')])
                         try:
                             await WIFI.reconnect_wifi_async()
                             print("disconnecting frm MQTT...")
@@ -446,17 +444,8 @@ class SmartHomeManager:
                         except Exception:
                             pass
                         gc.collect()
-                        # Sharp timeout limits connection block window to protect local actions
-                        # print("Restoring MQTT connection...")
                         await asyncio.wait_for(self.connect_mqtt_async(), timeout=15)
-                        # Re-establish broker state configurations
-                        # await asyncio.sleep(15)
-                        # print("Re-establishing MQTT subscription...")
                         await asyncio.wait_for(self.subscribe(self.subscribe_topic), timeout=15)
-                        # try:
-                        #     await self.announce_to_home_assistant(mac)
-                        # except:
-                        #     print("failed to announce_to_home_assistant")
                         print("Network communication pipeline completely restored.")
                     else:
                         print("Router infrastructure still down. Local tasks operating natively...")
@@ -484,7 +473,6 @@ class SmartHomeManager:
 
 
     async def subscribe(self, topic):
-        print(f"MQTT subscribe started...{topic}")
         self.mqtt.subscribe(topic) 
         await asyncio.sleep(1)
 
@@ -493,37 +481,27 @@ class SmartHomeManager:
         while True:
             if len(self.mqtt.queue) > 0:
                 topic, msg = self.mqtt.queue.popleft()
-                print(f"Processing {topic}: {msg}")
-                
-                if "alarm" in msg:
-                    print(f"Processing alarm command: {msg}")
-
                 # Iterate through your allowed_pins dictionary
                 for name, config in self.allowed_pins.items():
                     # Check if the message matches a "Turn On" command
                     payload = name.replace(" ", "")
                     if msg == f"{payload}ON":          
                         p = Pin(config['pin'], Pin.OUT)
-                        print(f"Turning ON {name} on pin {p}")
                         on_value = 0 if config.get("active_low") == 1 else 1
                         p.value(on_value)                        
                         try:
                             self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{msg}"))
                         except Exception as e:
-                            print(f"Error ON occurred while publishing MQTT message: {e}")
-                    
+                            print(f"Error ON occurred while publishing MQTT message: {e}")             
                     # Check if it matches a "Turn Off" command
                     elif msg == f"{payload}OFF":
                         p = Pin(config['pin'], Pin.OUT)
-                        print(f"Turning OFF {name} on pin {p}")
                         off_value = 1 if config.get("active_low") == 1 else 0
                         p.value(off_value)
                         try:
                             self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{msg}"))
                         except Exception as e:
                             print(f"Error OFF occurred while publishing MQTT message: {e}")
-
-
             await asyncio.sleep(0.1)
         
     async def announce_to_home_assistant(self,mac):
@@ -559,22 +537,15 @@ class SmartHomeManager:
                 config_payload["payload_on"] = f"{payload}ON"
                 config_payload["payload_off"] = f"{payload}OFF"
 
-
             self.subscribe_topic = f"{base_topic}/subscribe"
-            # self.connect_topic = f"{base_topic}/connect"
-            # Publish to: homeassistant/sensor/84f3eb23ea09/water_pump/config
             config_topic = f"{base_topic}/{clean_name}/config"
             self.allowed_pins[name]["state_topic"] = config_payload["state_topic"]
             self.allowed_pins[name]["config_topic"] = config_topic
             try:
                 if count == 0:
                     asyncio.create_task(self.subscribe(f"{self.subscribe_topic}"))
-                    # asyncio.create_task(self.mqtt.publish_config(self.connect_topic, self.getTime()))
-                    # self.mqtt.publish(config_payload["state_topic"], self.getTime())
-                    # asyncio.create_task(self.continuous_subscribe(3600))
                 count = 1
                 self.mqtt.publish_config(config_topic, json.dumps(config_payload))
-                # asyncio.create_task(self.continuous_publish_config(config_topic, config_payload, 900))
                 print(f"Published Home Assistant config for {name} to {config_topic}")
             except Exception as e:
                 print(f"Error occurred while publishing MQTT config for {name}: {e}")
@@ -592,7 +563,6 @@ class SmartHomeManager:
             print(f"Error in run occurred while connecting to MQTT: {e}")
 
         try:
-            #asyncio.create_task(self.subscribe(f"homeassistant/switch/{g.mac}/subscribe"))
             asyncio.create_task(self.announce_to_home_assistant(g.mac))
             asyncio.create_task(self.mqtt_listener_loop())
             asyncio.create_task(self.mqtt_processor_loop())
