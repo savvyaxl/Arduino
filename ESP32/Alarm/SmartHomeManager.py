@@ -23,7 +23,6 @@ class SmartHomeManager:
         self.mqtt = MQTT.MQTTHandler()
         self.subscribed = False
         self.subscribe_topic = None
-        self.connect_topic = None
 
     def getTime(self):
         dt = self.rtc.datetime()
