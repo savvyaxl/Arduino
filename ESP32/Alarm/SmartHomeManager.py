@@ -190,9 +190,10 @@ class SmartHomeManager:
             now = self.rtc.datetime()
             current_time_str = f"{now[0]}-{now[1]:02d}-{now[2]:02d} {now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
             current_day = self.DAY_NAMES[now[3]]
+            sorted_alarms = sorted(self.alarms, key=lambda x: (int(x['time'][0]), int(x['time'][1])))
 
             rows = ""
-            for i, a in enumerate(self.alarms):
+            for i, a in enumerate(sorted_alarms):
                 days_str = ", ".join([self.DAY_NAMES[d] for d in a['days']])
                 action_label = a.get('action', 'pulse').upper()
                 dur_info = f" | {a['duration']}s" if action_label == "PULSE" else ""
