@@ -128,8 +128,6 @@ class SmartHomeManager:
         # Get current time for the print statement
         now = self.rtc.datetime()
         ts = f"{now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
-        
-        print(f"ALARM TRIGGERED: '{name}' at {ts} | Action: {action.upper()}")
 
         if action == "on": 
             on_value = 0 if alarm.get("active_low") == 1 else 1
@@ -159,7 +157,6 @@ class SmartHomeManager:
                 self.mqtt.publish(state_topic, await self.formatted_message(alarm, f"{pn}OFF"))
             except Exception as e:
                 print(f"Error PULSE OFF occurred while publishing MQTT message: {e}")
-            print(f"ALARM FINISHED: '{name}' pulse complete.")
 
     async def alarm_checker_loop(self):
         print("Alarm Checker Task started...")
