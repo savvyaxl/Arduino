@@ -1,10 +1,9 @@
 
-import uasyncio as asyncio # type: ignore
-from SmartHomeManager import SmartHomeManager
+from batterytester import BatteryTester
 
 
-manager = SmartHomeManager()
+manager = BatteryTester(adc_pin_num=5, mosfet_pin_num=33, r_load=4.7, r1=46800, r2=9740, dutyMax = 1023)
 try:
-    asyncio.run(manager.run())
+    manager.run()
 except KeyboardInterrupt:
     pass

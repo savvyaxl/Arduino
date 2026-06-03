@@ -127,3 +127,11 @@ class BatteryTester:
 #     "status": "discharging"
 # }
 # mqtt.publish("battery/tester/state", json.dumps(data))
+
+# --- 3. Entry Point ---
+if __name__ == "__main__":
+    tester = BatteryTester(adc_pin_num=5, mosfet_pin_num=33, r_load=2.8, r1=46800, r2=9740)
+    try:
+        tester.read_voltage()
+    except KeyboardInterrupt:
+        pass
