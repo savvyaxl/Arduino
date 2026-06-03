@@ -133,6 +133,15 @@ class BatteryTester:
                     print(f"V: {v_bat:.2f}V | I: {current:.2f}A | W: {watts:.2f}W | Ah: {self.capacity_ah:.4f} | Seconds: {_count} | IR: {round(self.IR, 0)}" )
                 else:
                     print(f"V: {v_bat:.2f}V | I: {current:.2f}A | W: {watts:.2f}W | Ah: {self.capacity_ah:.4f} | Seconds: {_count}")
+                data = {
+                    "bettery_tester_volts": round(v_bat, 3),
+                    "bettery_tester_amps": round(current, 3),
+                    "bettery_tester_amp_hours": round(self.capacity_ah, 5),
+                    "bettery_tester_ir": round(self.IR, 0),
+                    "status": "idle"
+                }
+                # Yield the JSON string back to the caller
+                yield json.dumps(data)
                 
                 if v_bat <= cutoff_v:
                     self.stop_test("Cutoff Reached")
@@ -165,8 +174,6 @@ class BatteryTester:
                     print(f"V: {v_bat:.2f}V | I: {current:.2f}A | W: {watts:.2f}W | Ah: {self.capacity_ah:.4f} | Seconds: {_count} | IR: {round(self.IR, 0)}" )
                 else:
                     print(f"V: {v_bat:.2f}V | I: {current:.2f}A | W: {watts:.2f}W | Ah: {self.capacity_ah:.4f} | Seconds: {_count}")
-                
-                # Create the data payload
                 data = {
                     "bettery_tester_volts": round(v_bat, 3),
                     "bettery_tester_amps": round(current, 3),
@@ -176,11 +183,8 @@ class BatteryTester:
                     "bettery_tester_count": _count,
                     "status": "discharging"
                 }
-                
-                #print(f"publishing {data}")
                 # Yield the JSON string back to the caller
                 yield json.dumps(data)
-                #mqtt.publish("sam", json.dumps(data))
 
                 if v_bat <= cutoff_v:
                     self.stop_test("Cutoff Reached")
@@ -197,21 +201,28 @@ class BatteryTester:
         print(f"Test {reason}. Final Capacity: {self.capacity_ah:.4f} Ah with an internal resistance of {round(self.IR, 0)} mOhm")
 
     def read_voltage(self, maxcount=3, interval=1):
-        """Starts the discharge test. Blocks until complete."""
-
         self.load_pin.duty(0) 
         self.is_running = True
-        count = 0
+        _count = 0
         try:
-            while self.is_running and count < maxcount:
+            while self.is_running and _count < maxcount:
                 v_bat = self.get_voltage()
-                print(f"Count: {count} | V: {v_bat:.2f}V")
+                print(f"{_count} | V: {v_bat:.2f}V | Ah: {self.capacity_ah:.4f}")
+                data = {
+                    "bettery_tester_volts": round(v_bat, 3),
+                    "bettery_tester_amp_hours": round(self.capacity_ah, 5),
+                    "bettery_tester_ir": round(self.IR, 0),
+                    "bettery_tester_count": _count,
+                    "status": "discharging"
+                }
+                # Yield the JSON string back to the caller
+                yield json.dumps(data)
                 
-                if maxcount <= count:
-                    self.stop_test("Time Reached")
+                if maxcount <= _count:
+                    self.stop_test("Count Reached")
                     break
                 
-                count += 1
+                _count += 1
                 time.sleep(interval)
         except KeyboardInterrupt:
             self.stop_test("User Interrupted")
@@ -230,14 +241,17 @@ class BatteryTester:
             print(f"Error in run publish config in MQTT: {e}")
 
         try:
-            #self.run_test_mqtt(cutoff_v=3.0, interval=1)
-            
             for mqtt_json in self.run_test_mqtt(cutoff_v=3.0, interval=1):
-                # 'client' would be your Umqtt.simple instance
                 try:
                     self.mqtt.publish(f"{self.base_topic}/state", mqtt_json)
                 except Exception as e:
-                    print(f"Failed to publish MQTT message: {e}")
+                    print(f"Failed to publish MQTT message from run_test_mqtt: {e}")
+
+            for mqtt_json in self.read_voltage(maxcount=60000, interval=1):
+                try:
+                    self.mqtt.publish(f"{self.base_topic}/state", mqtt_json)
+                except Exception as e:
+                    print(f"Failed to publish MQTT message from run_test: {e}")
 
             
         except Exception as e:
