@@ -1,6 +1,6 @@
 # capacity_tester.py - A simple battery capacity tester for ESP32 using MicroPython
 
-from machine import Pin, ADC, PWM
+from machine import Pin, ADC, PWM # type: ignore
 import time, json
 from mqtt import MQTTHandler
 import uasyncio as asyncio # type: ignore
@@ -9,7 +9,7 @@ import globals as g
 
 class BatteryTester:
 
-    def __init__(self, adc_pin_num=5, mosfet_pin_num=33, r_load=4.7, r1=46800, r2=9740, dutyMax = 1023):
+    def __init__(self, adc_pin_num=5, mosfet_pin_num=33, r_load=4.7, r1=46800, r2=9740, dutyMax = 1023, DeviceName="Flat 1 Battery Tester"):
         """
         :param adc_pin_num: GPIO for voltage divider
         :param mosfet_pin_num: GPIO for MOSFET gate
@@ -38,41 +38,43 @@ class BatteryTester:
         self.mac = None
         self.type = None
         self.base_topic = None
+        self.DeviceName = DeviceName
+        self.clean_device_name = self.DeviceName.lower().replace(" ", "_")
         
-        print(f"Tester Initialized. Calculated Divider Ratio: {self.v_ratio:.3f}")
-
-    def announce_to_home_assistant(self):
-
-            
-            
-        names = {
-            "Bettery Tester Amp hours": {
+        self.names = {
+            "Amp Hours": {
                 "type": "sensor",
-                "unit": "Ah"
+                "unit": "Ah",
             },
-            "Bettery Tester Volts": {
+            "Volts": {
                 "type": "sensor",
                 "unit": "V"
             },
-            "Bettery Tester Watts": {
+            "Watts": {
                 "type": "sensor",
                 "unit": "W"
             },
-            "Bettery Tester Amps": {
+            "Amps": {
                 "type": "sensor",
                 "unit": "A"
             },
-            "Bettery Tester Count": {
+            "Count": {
                 "type": "sensor"
             },
-            "Bettery Tester IR": {
+            "IR": {
                 "type": "sensor",
                 "unit": "mΩ"
             }
         }
+
         
-        for name, info in names.items():
+        print(f"Tester Initialized. Calculated Divider Ratio: {self.v_ratio:.3f}")
+
+    def announce_to_home_assistant(self):
+        
+        for name, info in self.names.items():
             clean_name = name.lower().replace(" ", "_")
+            clean_device_name = self.DeviceName.lower().replace(" ", "_")
             if g.mac:
                 type = info["type"]
                 self.base_topic = f"homeassistant/{type}/{g.mac}"
@@ -80,12 +82,12 @@ class BatteryTester:
             # 1. Start with the mandatory fields
             config_payload = {
                 "name": name,
-                "unique_id": f"esp32_{clean_name}",
+                "unique_id": f"{clean_device_name}_{clean_name}",
                 "state_topic": f"{self.base_topic}/state",
-                "value_template": "{{ value_json." + clean_name + " }}",
+                "value_template": "{{ value_json." + f"{clean_device_name}_{clean_name}" + " }}",
                 "device": {
                     "identifiers": [f"esp32_{g.mac}"],
-                    "name": "Battery Tester ESP32"
+                    "name": self.DeviceName
                 }
             }
 
@@ -134,12 +136,13 @@ class BatteryTester:
                 else:
                     print(f"V: {v_bat:.2f}V | I: {current:.2f}A | W: {watts:.2f}W | Ah: {self.capacity_ah:.4f} | Seconds: {_count}")
                 data = {
-                    "bettery_tester_volts": round(v_bat, 3),
-                    "bettery_tester_amps": round(current, 3),
-                    "bettery_tester_amp_hours": round(self.capacity_ah, 5),
-                    "bettery_tester_ir": round(self.IR, 0),
+                    f"{self.clean_device_name}_volts": round(v_bat, 3),
+                    f"{self.clean_device_name}_amps": round(current, 3),
+                    f"{self.clean_device_name}_amp_hours": round(self.capacity_ah, 5),
+                    f"{self.clean_device_name}_ir": round(self.IR, 0),
                     "status": "idle"
                 }
+
                 # Yield the JSON string back to the caller
                 yield json.dumps(data)
                 
@@ -175,12 +178,12 @@ class BatteryTester:
                 else:
                     print(f"V: {v_bat:.2f}V | I: {current:.2f}A | W: {watts:.2f}W | Ah: {self.capacity_ah:.4f} | Seconds: {_count}")
                 data = {
-                    "bettery_tester_volts": round(v_bat, 3),
-                    "bettery_tester_amps": round(current, 3),
-                    "bettery_tester_amp_hours": round(self.capacity_ah, 5),
-                    "bettery_tester_watts": round(watts, 5),
-                    "bettery_tester_ir": round(self.IR, 0),
-                    "bettery_tester_count": _count,
+                    f"{self.clean_device_name}_volts": round(v_bat, 3),
+                    f"{self.clean_device_name}_amps": round(current, 3),
+                    f"{self.clean_device_name}_amp_hours": round(self.capacity_ah, 5),
+                    f"{self.clean_device_name}_watts": round(watts, 5),
+                    f"{self.clean_device_name}_ir": round(self.IR, 0),
+                    f"{self.clean_device_name}_count": _count,
                     "status": "discharging"
                 }
                 # Yield the JSON string back to the caller
@@ -259,7 +262,7 @@ class BatteryTester:
 
 # --- 3. Entry Point ---
 if __name__ == "__main__":
-    tester = BatteryTester(adc_pin_num=5, mosfet_pin_num=33, r_load=4.7, r1=46800, r2=9740, dutyMax = 1023)
+    tester = BatteryTester(adc_pin_num=5, mosfet_pin_num=33, r_load=4.7, r1=46800, r2=9740, dutyMax = 1023, DeviceName="Flat 1 Battery Tester")
     try:
         tester.read_voltage(maxcount=3)
         tester.run_test(cutoff_v=3, interval=1)
