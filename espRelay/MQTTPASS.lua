@@ -27,6 +27,8 @@ mqtt_client_cfg.topic_test          = 'homeassistant/sensor/'..mqtt_client_cfg.c
 
 print(mqtt_client_cfg.topic_subscribe)
 print(mqtt_client_cfg.topic_state)
+print(mqtt_client_cfg.host)
+print(mqtt_client_cfg.port)
 
 c=mqtt.Client(mqtt_client_cfg.clientid,mqtt_client_cfg.keepalive)
 c:lwt("/lwt", "offline "..mqtt_client_cfg.clientid, 0, 0)

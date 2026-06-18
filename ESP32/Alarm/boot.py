@@ -4,5 +4,5 @@ import time
 
 WiFiHandler("esp32-alarm")
 # manager = SmartHomeManager()
-# time.sleep(5) # Wait for WiFi to connect
+time.sleep(2) # Wait for WiFi to connect
 # manager.sync_time()

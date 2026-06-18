@@ -84,9 +84,9 @@ class BatteryTester:
                 "name": name,
                 "unique_id": f"{clean_device_name}_{clean_name}",
                 "state_topic": f"{self.base_topic}/state",
-                "value_template": "{{ value_json." + f"{clean_device_name}_{clean_name}" + " }}",
+                "value_template": "{{ value_json['" + f"{clean_device_name}_{clean_name}" + "'] }}",
                 "device": {
-                    "identifiers": [f"esp32_{g.mac}"],
+                    "identifiers": [f"esp32_{clean_device_name}_{g.mac}"],
                     "name": self.DeviceName
                 }
             }
@@ -142,13 +142,14 @@ class BatteryTester:
                     f"{self.clean_device_name}_ir": round(self.IR, 0),
                     "status": "idle"
                 }
-
-                # Yield the JSON string back to the caller
-                yield json.dumps(data)
-                
                 if v_bat <= cutoff_v:
                     self.stop_test("Cutoff Reached")
                     break
+                
+                # Yield the JSON string back to the caller
+                yield json.dumps(data)
+                
+
                 
                 _count += interval
                 time.sleep(interval)
@@ -186,12 +187,14 @@ class BatteryTester:
                     f"{self.clean_device_name}_count": _count,
                     "status": "discharging"
                 }
-                # Yield the JSON string back to the caller
-                yield json.dumps(data)
-
                 if v_bat <= cutoff_v:
                     self.stop_test("Cutoff Reached")
                     break
+                
+                # Yield the JSON string back to the caller
+                yield json.dumps(data)
+
+
                 _count += interval    
                 time.sleep(interval)
                 
@@ -212,11 +215,11 @@ class BatteryTester:
                 v_bat = self.get_voltage()
                 print(f"{_count} | V: {v_bat:.2f}V | Ah: {self.capacity_ah:.4f}")
                 data = {
-                    "bettery_tester_volts": round(v_bat, 3),
-                    "bettery_tester_amp_hours": round(self.capacity_ah, 5),
-                    "bettery_tester_ir": round(self.IR, 0),
-                    "bettery_tester_count": _count,
-                    "status": "discharging"
+                    f"{self.clean_device_name}_volts": round(v_bat, 3),
+                    f"{self.clean_device_name}_amp_hours": round(self.capacity_ah, 5),
+                    f"{self.clean_device_name}_ir": round(self.IR, 0),
+                    f"{self.clean_device_name}_count": _count,
+                    "status": "stopped"
                 }
                 # Yield the JSON string back to the caller
                 yield json.dumps(data)
@@ -250,11 +253,11 @@ class BatteryTester:
                 except Exception as e:
                     print(f"Failed to publish MQTT message from run_test_mqtt: {e}")
 
-            for mqtt_json in self.read_voltage(maxcount=60000, interval=1):
+            for mqtt_json in self.read_voltage(maxcount=10, interval=1):
                 try:
                     self.mqtt.publish(f"{self.base_topic}/state", mqtt_json)
                 except Exception as e:
-                    print(f"Failed to publish MQTT message from run_test: {e}")
+                    print(f"Failed to publish MQTT message from read_voltage: {e}")
 
             
         except Exception as e:
