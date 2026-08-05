@@ -119,7 +119,9 @@ class SmartHomeManager:
         return json.dumps(data) if data else "{}"
 
     async def _trigger_action(self, alarm):
-        p = Pin(alarm['pin'], Pin.OUT)
+        # 1. Initialize all pins in the list
+        pins = [Pin(p_num, Pin.OUT) for p_num in alarm['pins']]
+        
         action = alarm.get('action', 'pulse')
         name = alarm.get('name', 'Unnamed Alarm')
         pn = alarm.get('pin_name').replace(" ", "")
@@ -129,30 +131,43 @@ class SmartHomeManager:
         now = self.rtc.datetime()
         ts = f"{now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
 
+        # Pre-calculate state values based on active_low configuration
+        on_value = 0 if alarm.get("active_low") == 1 else 1
+        off_value = 1 if alarm.get("active_low") == 1 else 0
+
         if action == "on": 
-            on_value = 0 if alarm.get("active_low") == 1 else 1
-            p.value(on_value)                        
+            # 2. Turn ALL pins ON
+            for p in pins:
+                p.value(on_value)                        
             try:
                 self.mqtt.publish(state_topic, await self.formatted_message(alarm, f"{pn}ON"))
             except Exception as e:
                 print(f"Error ON occurred while publishing MQTT message: {e}")
+
         elif action == "off": 
-            off_value = 1 if alarm.get("active_low") == 1 else 0
-            p.value(off_value)                        
+            # 3. Turn ALL pins OFF
+            for p in pins:
+                p.value(off_value)                        
             try:
                 self.mqtt.publish(state_topic, await self.formatted_message(alarm, f"{pn}OFF"))
             except Exception as e:
                 print(f"Error OFF occurred while publishing MQTT message: {e}")
+
         elif action == "pulse":
-            on_value = 0 if alarm.get("active_low") == 1 else 1
-            p.value(on_value)                        
+            # 4. Pulse ON: Turn ALL pins ON immediately
+            for p in pins:
+                p.value(on_value)                        
             try:
                 self.mqtt.publish(state_topic, await self.formatted_message(alarm, f"{pn}ON"))
             except Exception as e:
                 print(f"Error PULSE ON occurred while publishing MQTT message: {e}")
+            
+            # Non-blocking async sleep for duration
             await asyncio.sleep(int(alarm['duration']))
-            off_value = 1 if alarm.get("active_low") == 1 else 0
-            p.value(off_value)                        
+            
+            # 5. Pulse OFF: Turn ALL pins OFF together
+            for p in pins:
+                p.value(off_value)                        
             try:
                 self.mqtt.publish(state_topic, await self.formatted_message(alarm, f"{pn}OFF"))
             except Exception as e:
