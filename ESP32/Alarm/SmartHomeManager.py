@@ -497,19 +497,29 @@ class SmartHomeManager:
                 for name, config in self.allowed_pins.items():
                     # Check if the message matches a "Turn On" command
                     payload = name.replace(" ", "")
+                    
                     if msg == f"{payload}ON":          
-                        p = Pin(config['pin'], Pin.OUT)
+                        # Initialize all pins mapped to this device configuration
+                        pins = [Pin(p_num, Pin.OUT) for p_num in config['pins']]
                         on_value = 0 if config.get("active_low") == 1 else 1
-                        p.value(on_value)                        
+                        
+                        # Turn ALL pins ON
+                        for p in pins:
+                            p.value(on_value)                        
                         try:
                             self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{msg}"))
                         except Exception as e:
                             print(f"Error ON occurred while publishing MQTT message: {e}")             
+                    
                     # Check if it matches a "Turn Off" command
                     elif msg == f"{payload}OFF":
-                        p = Pin(config['pin'], Pin.OUT)
+                        # Initialize all pins mapped to this device configuration
+                        pins = [Pin(p_num, Pin.OUT) for p_num in config['pins']]
                         off_value = 1 if config.get("active_low") == 1 else 0
-                        p.value(off_value)
+                        
+                        # Turn ALL pins OFF
+                        for p in pins:
+                            p.value(off_value)
                         try:
                             self.mqtt.publish(config['state_topic'], await self.formatted_homeassistant_message(name, f"{msg}"))
                         except Exception as e:
