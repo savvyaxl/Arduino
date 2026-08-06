@@ -335,8 +335,9 @@ class SmartHomeManager:
             name_selection = request.args.get('pn')
             clean_name = name_selection.lower().replace(" ", "_")
 
+            # 1. Update the check to extract the list of pins
             if name_selection in self.allowed_pins:
-                actual_gpio = self.allowed_pins[name_selection]["pin"]
+                actual_gpios = self.allowed_pins[name_selection]["pins"] # Changed from "pin" to "pins"
             else:
                 return "Invalid Pin Selection", 400 
 
@@ -346,8 +347,8 @@ class SmartHomeManager:
                 "days": selected_days,
                 "action": request.args.get('a'),
                 "duration": int(float(request.args.get('d', 0))),
-                "pin": actual_gpio,        # Store the safe GPIO number
-                "pin_name": name_selection, # Helpful for displaying in the UI later
+                "pins": actual_gpios,        # 2. Store the list of safe GPIO numbers
+                "pin_name": name_selection,  # Helpful for displaying in the UI later
                 "triggered_today": False,
                 "type": self.allowed_pins[name_selection].get("type"),
                 "active_low": self.allowed_pins[name_selection].get("active_low")
