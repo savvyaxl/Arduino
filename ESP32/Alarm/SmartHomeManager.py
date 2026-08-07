@@ -211,7 +211,11 @@ class SmartHomeManager:
                 dur_info = f" | {a['duration']}s" if action_label == "PULSE" else ""
                 name = a.get('name', 'Alarm')
                 
-                rows += f"<li><strong>{name}</strong><br>{a['time'][0]:02d}:{a['time'][1]:02d} | {days_str} | Pin:{a['pin']} | {action_label}{dur_info} <a class='del' href='/del?id={i}'>Delete</a></li>"
+                # Convert the pins list back into a clean string (e.g. "1, 2") for display
+                pins_display = ", ".join(str(p) for p in a.get('pins', []))
+                
+                # Updated the string template to reference pins_display instead of a['pin']
+                rows += f"<li><strong>{name}</strong><br>{a['time'][0]:02d}:{a['time'][1]:02d} | {days_str} | Pins:{pins_display} | {action_label}{dur_info} <a class='del' href='/del?id={i}'>Delete</a></li>"
             
             day_boxes = "".join([f'<label><input type="checkbox" name="days" value="{i}" class="day-check" checked> {name}</label> ' for i, name in enumerate(self.DAY_NAMES)])
             pin_options = "".join([f'<option value="{name[0]}">{name[0]}</option>' 

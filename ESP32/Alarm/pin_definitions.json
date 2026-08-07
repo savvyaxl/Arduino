@@ -1,27 +1,21 @@
 {
     "Test1 Pump 4": {
-        "config_topic": "homeassistant/switch/84f703eac47c/water_pump_4/config",
         "pins": [6],
         "payload_off": "Test1Pump4OFF",
-        "state_topic": "homeassistant/switch/84f703eac47c/state",
         "active_low": 1,
         "payload_on": "Test1Pump4ON",
         "type": "switch"
     },
     "Test2 Light 4": {
-        "config_topic": "homeassistant/switch/84f703eac47c/tomato_light_4/config",
-        "pins": [5],
+        "pins": [5,7],
         "payload_off": "Test2Light4OFF",
-        "state_topic": "homeassistant/switch/84f703eac47c/state",
         "active_low": 1,
         "payload_on": "Test2Light4ON",
         "type": "switch"
     },
     "Test3 Pump 3": {
-        "config_topic": "homeassistant/switch/84f703eac47c/water_pump_3/config",
         "pins": [4],
         "payload_off": "Test3Pump3OFF",
-        "state_topic": "homeassistant/switch/84f703eac47c/state",
         "active_low": 1,
         "payload_on": "Test3Pump3ON",
         "type": "switch"
