@@ -484,7 +484,7 @@ class SmartHomeManager:
                 self.dht_sensor.measure()
                 self.temp = self.dht_sensor.temperature()
                 self.hum = self.dht_sensor.humidity()
-                payload = json.dumps({"esp32_s2_temperature": self.temp, "esp32_s2_humidity ": self.hum})
+                payload = json.dumps({"esp32_s2_temperature": self.temp, "esp32_s2_humidity": self.hum})
                 self.mqtt.publish(f"homeassistant/sensor/{g.mac}/state", payload)
             except Exception as e:
                 print(f"Error occurred while sending DHT data via MQTT: {e}")
