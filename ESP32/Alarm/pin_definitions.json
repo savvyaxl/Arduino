@@ -1,23 +1,21 @@
 {
-    "Test1 Pump 4": {
+    "Lights": {
+        "type": "switch",
         "pins": [6],
-        "payload_off": "Test1Pump4OFF",
-        "active_low": 1,
-        "payload_on": "Test1Pump4ON",
-        "type": "switch"
+        "active_low": 1
     },
-    "Test2 Light 4": {
-        "pins": [5,7],
-        "payload_off": "Test2Light4OFF",
-        "active_low": 1,
-        "payload_on": "Test2Light4ON",
-        "type": "switch"
+    "ESP32 S2 Temperature": {
+        "type": "sensor",
+        "pins": [5],
+        "device_class": "temperature",
+        "value_template_addon": " | round(1)",
+        "unit_of_measurement": "°C"
     },
-    "Test3 Pump 3": {
-        "pins": [4],
-        "payload_off": "Test3Pump3OFF",
-        "active_low": 1,
-        "payload_on": "Test3Pump3ON",
-        "type": "switch"
+    "ESP32 S2 Humidity": {
+        "type": "sensor",
+        "pins": [5],
+        "device_class": "humidity",
+        "value_template_addon": " | round(1)",
+        "unit_of_measurement": "°C"
     }
 }

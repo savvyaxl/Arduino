@@ -7,6 +7,7 @@ from mysecrets import secrets
 import mqtt as MQTT
 import wifi_as as WIFI
 import globals as g
+import dht
 
 class SmartHomeManager:
     STORAGE_FILE = "alarms.json"
@@ -23,6 +24,9 @@ class SmartHomeManager:
         self.mqtt = MQTT.MQTTHandler()
         self.subscribed = False
         self.subscribe_topic = None
+        self.dht_sensor = dht.DHT11(Pin(5))  # Initialize DHT11 sensor on GPIO 5
+        self.temp = None
+        self.hum = None
 
     def getTime(self):
         dt = self.rtc.datetime()
@@ -197,12 +201,18 @@ class SmartHomeManager:
             current_day = self.DAY_NAMES[now[3]]
             return f"{current_day} {current_time_str}", 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
+        @self.app.route('/get-temp')
+        async def get_temp(request):
+                return f"{self.temp} {self.hum}", 200, {'Content-Type': 'text/plain; charset=utf-8'}
+
         @self.app.route('/')
         async def index(request):
             now = self.rtc.datetime()
             current_time_str = f"{now[0]}-{now[1]:02d}-{now[2]:02d} {now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
             current_day = self.DAY_NAMES[now[3]]
             sorted_alarms = sorted(self.alarms, key=lambda x: (int(x['time'][0]), int(x['time'][1])))
+            temp = self.temp
+            hum = self.hum
 
             rows = ""
             for i, a in enumerate(sorted_alarms):
@@ -230,6 +240,8 @@ class SmartHomeManager:
                     body {{ font-family: sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }}
                     .time-display {{ background: #333; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; border: 1px solid #03dac6; }}
                     .time-display h3 {{ margin: 0; color: #03dac6; }}
+                    .temp-display {{ background: #333; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; border: 1px solid #03dac6; }}
+                    .temp-display h3 {{ margin: 0; color: #03dac6; }}
                     ul {{ list-style: none; padding: 0; }}
                     li {{ background: #1e1e1e; padding: 10px; margin-bottom: 15px; border-radius: 5px; border: 1px solid #333; line-height: 1.6; }}
                     input, select {{ background: #2c2c2c; color: white; border: 1px solid #444; padding: 8px; border-radius: 4px; width: 100%; margin: 5px 0; box-sizing: border-box; }}
@@ -268,6 +280,20 @@ class SmartHomeManager:
                         }}
                     }}
 
+                    let timerInstanceTemp = null;
+
+                    async function fetchLiveTemp() {{
+                        try {{
+                            let res = await fetch('/get-temp');
+                            if (res.ok) {{
+                                let txt = await res.text();
+                                document.getElementById('live-temp').innerText = txt;
+                            }}
+                        }} catch (err) {{
+                            console.log("Temperature sync failure", err);
+                        }}
+                    }}
+
                     function manageAutoRefresh() {{
                         const checkbox = document.getElementById('auto-refresh-toggle');
                         if (checkbox.checked) {{
@@ -279,6 +305,18 @@ class SmartHomeManager:
                             timerInstance = null;
                         }}
                     }}
+                    function manageAutoRefreshTemp() {{
+                        const checkbox = document.getElementById('auto-refresh-toggle-temp');
+                        if (checkbox.checked) {{
+                            if (!timerInstanceTemp) {{
+                                timerInstanceTemp = setInterval(fetchLiveTemp, 10000);
+                            }}
+                        }} else {{
+                            clearInterval(timerInstanceTemp);
+                            timerInstanceTemp = null;
+                        }}
+                    }}
+                    
                     
                     window.addEventListener('DOMContentLoaded', function() {{
                         var devSelect = document.getElementById('dev-select');
@@ -286,6 +324,7 @@ class SmartHomeManager:
                         
                         // Initialize auto-refresh when the DOM finishes rendering
                         manageAutoRefresh();
+                        manageAutoRefreshTemp();
                     }});
                 </script>
             </head>
@@ -299,6 +338,19 @@ class SmartHomeManager:
                         <span style="margin: 0 10px;">|</span>
                         <label>
                             <input type="checkbox" id="auto-refresh-toggle" checked onchange="manageAutoRefresh()"> Auto-Refresh (1s)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="temp-display">
+                    <!-- Added distinct targeting ID here -->
+                    <h3 id="live-temp">{temp} °C {hum} %</h3>
+                    
+                    <div class="refresh-controls">
+                        <button onclick="fetchLiveTemp()">↻ Refresh Temperature</button>
+                        <span style="margin: 0 10px;">|</span>
+                        <label>
+                            <input type="checkbox" id="auto-refresh-toggle-temp" checked onchange="manageAutoRefreshTemp()"> Auto-Refresh (10s)
                         </label>
                     </div>
                 </div>
@@ -424,6 +476,22 @@ class SmartHomeManager:
             except ValueError as e:
                 return f"<h3>JSON Syntax Error! Config not saved.</h3><p>{str(e)}</p><a href='/config'>Go Back</a>"
 
+
+    async def mqtt_send_dht_loop(self):
+        print("MQTT DHT Sender Task started...")
+        while True:
+            try:
+                self.dht_sensor.measure()
+                self.temp = self.dht_sensor.temperature()
+                self.hum = self.dht_sensor.humidity()
+                payload = json.dumps({"esp32_s2_temperature": self.temp, "esp32_s2_humidity ": self.hum})
+                self.mqtt.publish(f"homeassistant/sensor/{g.mac}/state", payload)
+            except Exception as e:
+                print(f"Error occurred while sending DHT data via MQTT: {e}")
+                self.temp = "N/A"
+                self.hum = "N/A"
+            await asyncio.sleep(10)  # Send every 10 seconds
+
     async def mqtt_listener_loop(self):
         print("MQTT Listener started...")
         last_healthy_time = time.time()
@@ -547,22 +615,28 @@ class SmartHomeManager:
                 "value_template": "{{ value_json." + clean_name + " }}",
                 "device": {
                     "identifiers": [f"esp32_{mac}"],
-                    "name": "ESP32 Smart Hub"
+                    "name": "ESP32 Smart Hub with Temperature and Humidity",
+                    "model": "ESP32 S2 MINI"
                 }
             }
 
             # 2. Only add optional items if they have a value
-            if info.get("unit"):
-                config_payload["unit_of_measurement"] = info["unit"]
-
             if info.get("device_class"):
                 config_payload["device_class"] = info["device_class"]
 
             # 3. If you are adding the Switch functionality we discussed:
-            if info.get("type") == "switch":
+            if type == "switch":
                 config_payload["command_topic"] = f"{base_topic}/subscribe"
                 config_payload["payload_on"] = f"{payload}ON"
                 config_payload["payload_off"] = f"{payload}OFF"
+
+            if type == "sensor":
+                addon = info["value_template_addon"]
+                config_payload["unit_of_measurement"] = info["unit_of_measurement"]
+                config_payload["value_template"] = "{{ value_json." + clean_name + addon + " }}" 
+
+
+ 
 
             self.subscribe_topic = f"{base_topic}/subscribe"
             config_topic = f"{base_topic}/{clean_name}/config"
@@ -593,6 +667,7 @@ class SmartHomeManager:
             asyncio.create_task(self.announce_to_home_assistant(g.mac))
             asyncio.create_task(self.mqtt_listener_loop())
             asyncio.create_task(self.mqtt_processor_loop())
+            asyncio.create_task(self.mqtt_send_dht_loop())
         except Exception as e:
             print(f"Error in run subscribe, publish in MQTT: {e}")
 
