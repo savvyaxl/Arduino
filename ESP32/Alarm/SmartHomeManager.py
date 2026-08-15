@@ -7,14 +7,16 @@ from mysecrets import secrets
 import mqtt as MQTT
 import wifi_as as WIFI
 import globals as g
-import dht
+import dht # type: ignore
+import onewire # type: ignore
+import ds18x20 # type: ignore
 
 class SmartHomeManager:
     STORAGE_FILE = "alarms.json"
     PINDEF_FILE = "pin_definitions.json"
     DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-    def __init__(self, utc_offset=-3):
+    def __init__(self, utc_offset=-3, ds18x20_pin=None, dht_pin=None):
         self.rtc = RTC()
         self.offset = utc_offset * 3600
         self.alarms = self._load_alarms()
@@ -24,9 +26,18 @@ class SmartHomeManager:
         self.mqtt = MQTT.MQTTHandler()
         self.subscribed = False
         self.subscribe_topic = None
-        self.dht_sensor = dht.DHT11(Pin(5))  # Initialize DHT11 sensor on GPIO 5
-        self.temp = None
-        self.hum = None
+        if dht_pin is not None:
+            self.dht_sensor = dht.DHT11(Pin(dht_pin))  # Initialize DHT11 sensor on the specified GPIO
+            self.temp = None
+            self.hum = None
+        if ds18x20_pin is not None:
+            self.ds_sensor = None
+            self.init_ds18x20(ds18x20_pin)  # Initialize DS18X20 sensor on GPIO 5  
+            self.temp_c = None
+
+    def init_ds18x20 (self, pin_number=5):
+        ow = onewire.OneWire(Pin(pin_number))  # Initialize OneWire on the specified GPIO
+        self.ds_sensor = ds18x20.DS18X20(ow)
 
     def getTime(self):
         dt = self.rtc.datetime()
@@ -460,9 +471,9 @@ class SmartHomeManager:
         # --- ROUTE 2: Handle Save, Reload Variable, and Show Options ---
         @self.app.route('/config', methods=['POST'])
         async def save_config(request):
-            global my_runtime_variable  # Reference your main configuration variable
+            #global my_runtime_variable  # Reference your main configuration variable
             raw_json = request.form.get('json_data', '{}').replace("'", '"')
-            
+
             try:
                 # Validate JSON format
                 json.loads(raw_json)
@@ -491,6 +502,42 @@ class SmartHomeManager:
                 self.temp = "N/A"
                 self.hum = "N/A"
             await asyncio.sleep(10)  # Send every 10 seconds
+
+    async def mqtt_send_ds18x20_loop(self):
+        print("MQTT DS18X20 Sender Task started...")
+        while True:
+            try:
+                print("Scanning for 1-Wire devices...")
+                roms = self.ds_sensor.scan()
+                print(f"Found {len(roms)} Dallas temperature sensor(s).")
+    
+                if not roms:
+                    print("No sensors found. Check your wiring and pull-up resistor.")
+                    return
+                
+            except Exception as e:
+                print(f"Error occurred while reading DS18X20 sensor: {e}")
+            await asyncio.sleep(10)  # Send every 10 seconds
+
+            try:
+                # Start temperature conversion across all sensors
+                self.ds_sensor.convert_temp()
+                
+                # Yield control to the event loop during the 750ms conversion time
+                await asyncio.sleep_ms(750)
+                
+                # Read data from each discovered sensor
+                for rom in roms:
+                    rom_address = ''.join(['{:02x}'.format(b) for b in rom])
+                    temp_c = self.ds_sensor.read_temp(rom)
+                    
+                    print(f"Temp: {temp_c:.2f}°C")
+                    payload = json.dumps({"esp32_s2_dallas_temperature": temp_c})
+                    self.mqtt.publish(f"homeassistant/sensor/{g.mac}/state", payload)
+                
+            except Exception as e:
+                print("Error reading sensor:", e)
+
 
     async def mqtt_listener_loop(self):
         print("MQTT Listener started...")
@@ -605,6 +652,26 @@ class SmartHomeManager:
             clean_name = name.lower().replace(" ", "_")
             payload = name.replace(" ", "")
             type = info.get("type", "sensor")
+
+
+            while mac is None:
+                print("MAC address is None, waiting for hardware initialization...")
+                await asyncio.sleep(1)
+                try:
+                    wlan_interface = network.WLAN(network.STA_IF)
+                    raw_mac = wlan_interface.config('mac')
+                    if raw_mac:
+                        g.mac = ''.join(['%02x' % b for b in raw_mac])
+                except Exception:
+                    pass
+                mac = g.mac  # Re-evaluate local variable to break the loop
+
+                
+            # mac = g.mac  # Use the global MAC address variable
+            # while mac is None:
+            #     print("MAC address is None, waiting for it to be set...")
+            #     await asyncio.sleep(1)
+            #     mac = g.mac  # Re-check the global MAC address variable
             base_topic = f"homeassistant/{type}/{mac}"
 
             # 1. Start with the mandatory fields
@@ -664,10 +731,14 @@ class SmartHomeManager:
             print(f"Error in run occurred while connecting to MQTT: {e}")
 
         try:
+            await asyncio.sleep(2)
             asyncio.create_task(self.announce_to_home_assistant(g.mac))
             asyncio.create_task(self.mqtt_listener_loop())
             asyncio.create_task(self.mqtt_processor_loop())
-            asyncio.create_task(self.mqtt_send_dht_loop())
+            #asyncio.create_task(self.mqtt_send_dht_loop())
+            if self.ds18x20_pin is not None:
+                asyncio.create_task(self.mqtt_send_ds18x20_loop())
+
         except Exception as e:
             print(f"Error in run subscribe, publish in MQTT: {e}")
 
