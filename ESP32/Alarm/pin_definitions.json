@@ -4,7 +4,7 @@
         "pins": [6],
         "active_low": 1
     },
-    "ESP32 S2 Temperature": {
+    "ESP32 S2 Dallas Temperature": {
         "type": "sensor",
         "pins": [5],
         "device_class": "temperature",

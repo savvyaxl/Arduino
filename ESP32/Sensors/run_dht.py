@@ -1,5 +1,5 @@
-import uasyncio as asyncio
-from machine import Pin
+import uasyncio as asyncio # type: ignore
+from machine import Pin # type: ignore
 import dht
 
 # Initialize the DHT11 sensor on GPIO 5

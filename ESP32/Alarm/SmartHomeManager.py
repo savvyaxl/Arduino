@@ -1,6 +1,6 @@
 import uasyncio as asyncio # type: ignore
 import json, ntptime, time, ds1302 # type: ignore
-from machine import RTC, Pin # type: ignore
+from machine import RTC, Pin, SoftI2C # type: ignore
 from microdot.microdot import Microdot
 import gc, network # type: ignore
 from mysecrets import secrets
@@ -9,14 +9,16 @@ import wifi_as as WIFI
 import globals as g
 import dht # type: ignore
 import onewire # type: ignore
-import ds18x20 # type: ignore
+from writer import Writer
+import freesans20
+import courier20
 
 class SmartHomeManager:
     STORAGE_FILE = "alarms.json"
     PINDEF_FILE = "pin_definitions.json"
     DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-    def __init__(self, utc_offset=-3, ds18x20_pin=None, dht_pin=None):
+    def __init__(self, utc_offset=-3, dhtPin=None, owPin=None, scl=Pin(7), sda=Pin(9)):
         self.rtc = RTC()
         self.offset = utc_offset * 3600
         self.alarms = self._load_alarms()
@@ -26,18 +28,60 @@ class SmartHomeManager:
         self.mqtt = MQTT.MQTTHandler()
         self.subscribed = False
         self.subscribe_topic = None
-        if dht_pin is not None:
-            self.dht_sensor = dht.DHT11(Pin(dht_pin))  # Initialize DHT11 sensor on the specified GPIO
-            self.temp = None
-            self.hum = None
-        if ds18x20_pin is not None:
-            self.ds_sensor = None
-            self.init_ds18x20(ds18x20_pin)  # Initialize DS18X20 sensor on GPIO 5  
-            self.temp_c = None
 
-    def init_ds18x20 (self, pin_number=5):
-        ow = onewire.OneWire(Pin(pin_number))  # Initialize OneWire on the specified GPIO
-        self.ds_sensor = ds18x20.DS18X20(ow)
+        self.temp = None
+        self.hum = None
+        if dhtPin is not None:
+            self.dht_sensor = dht.DHT11(Pin(dhtPin))  # Initialize DHT11 sensor on specified GPIO
+
+        self.ds_sensor = None
+        self.roms = []
+        self.temp_c = None
+        if owPin is not None:
+            import ds18x20 # type: ignore
+            ow = onewire.OneWire(Pin(owPin))  # Initialize OneWire on specified GPIO
+            self.ds_sensor = ds18x20.DS18X20(ow)
+            print("MQTT DS18X20 Sender Task started...")
+            print("Scanning for 1-Wire devices...")
+            try:
+                self.roms = self.ds_sensor.scan()
+                print(f"Found {len(self.roms)} Dallas temperature sensor(s).")
+            except Exception as e:
+                print(f"Initial scan failed: {e}")
+                self.roms = []
+
+        if scl is not None and sda is not None:
+            import ssd1306  # type: ignore
+            from writer import Writer
+            #import freesans20
+            import courier20
+
+            # Use SoftI2C to avoid peripheral conflicts
+            i2c = SoftI2C(scl=Pin(scl), sda=Pin(sda))
+
+            # Test scanning for the display address (should print [60] or [0x3C])
+            print("I2C Scan:", i2c.scan())
+
+            # Define display size
+            width = 128
+            height = 64
+
+            # Create the display object (default I2C address is 0x3C)
+            self.oled = ssd1306.SSD1306_I2C(width, height, i2c)
+            self.w = Writer(self.oled, courier20)
+
+            # Updated database mapping your sensor ROM to the corrected slope and intercept
+            self.CALIBRATION_MAP = {
+                "2894816b00000071": (0.98172, -0.16892), 
+            }
+
+    async def write_ds18x20_to_oled(self, temp_c, line=0):
+
+        print(f"Temp: {temp_c:.2f}°C")
+        Writer.set_textpos(self.oled, line * 20, 0)
+        #w.printstring(f"Temp: {temp_c:.2f} {calibrated_temp:.2f} C")
+        self.w.printstring(f"012345678 {temp_c:.2f} 012345678")
+        self.oled.show()
 
     def getTime(self):
         dt = self.rtc.datetime()
@@ -222,8 +266,6 @@ class SmartHomeManager:
             current_time_str = f"{now[0]}-{now[1]:02d}-{now[2]:02d} {now[4]:02d}:{now[5]:02d}:{now[6]:02d}"
             current_day = self.DAY_NAMES[now[3]]
             sorted_alarms = sorted(self.alarms, key=lambda x: (int(x['time'][0]), int(x['time'][1])))
-            temp = self.temp
-            hum = self.hum
 
             rows = ""
             for i, a in enumerate(sorted_alarms):
@@ -241,6 +283,23 @@ class SmartHomeManager:
             day_boxes = "".join([f'<label><input type="checkbox" name="days" value="{i}" class="day-check" checked> {name}</label> ' for i, name in enumerate(self.DAY_NAMES)])
             pin_options = "".join([f'<option value="{name[0]}">{name[0]}</option>' 
                             for name in self.allowed_pins.items()])
+
+            # --- PRE-BUILD THE OLED/TEMP DISPLAY HTML BLOCKS HERE ---
+            temp_html_block = ""
+            if self.temp is not None:
+                temp_html_block = f"""
+                <div class="temp-display">
+                    <h3 id="live-temp">{self.temp} °C {self.hum} %</h3>
+                    <div class="refresh-controls">
+                        <button onclick="fetchLiveTemp()">↻ Refresh Temperature</button>
+                        <span style="margin: 0 10px;">|</span>
+                        <label>
+                            <input type="checkbox" id="auto-refresh-toggle-temp" checked onchange="manageAutoRefreshTemp()"> Auto-Refresh (10s)
+                        </label>
+                    </div>
+                </div>
+                """
+
 
             html = f"""
             <html>
@@ -353,19 +412,8 @@ class SmartHomeManager:
                     </div>
                 </div>
 
-                <div class="temp-display">
-                    <!-- Added distinct targeting ID here -->
-                    <h3 id="live-temp">{temp} °C {hum} %</h3>
-                    
-                    <div class="refresh-controls">
-                        <button onclick="fetchLiveTemp()">↻ Refresh Temperature</button>
-                        <span style="margin: 0 10px;">|</span>
-                        <label>
-                            <input type="checkbox" id="auto-refresh-toggle-temp" checked onchange="manageAutoRefreshTemp()"> Auto-Refresh (10s)
-                        </label>
-                    </div>
-                </div>
-
+                {temp_html_block}
+                
                 <h2>Active Alarms</h2>
                 <ul>{rows if rows else "<li>No alarms set</li>"}</ul>
                 <hr>
@@ -471,9 +519,9 @@ class SmartHomeManager:
         # --- ROUTE 2: Handle Save, Reload Variable, and Show Options ---
         @self.app.route('/config', methods=['POST'])
         async def save_config(request):
-            #global my_runtime_variable  # Reference your main configuration variable
+            global my_runtime_variable  # Reference your main configuration variable
             raw_json = request.form.get('json_data', '{}').replace("'", '"')
-
+            
             try:
                 # Validate JSON format
                 json.loads(raw_json)
@@ -504,40 +552,56 @@ class SmartHomeManager:
             await asyncio.sleep(10)  # Send every 10 seconds
 
     async def mqtt_send_ds18x20_loop(self):
-        print("MQTT DS18X20 Sender Task started...")
         while True:
-            try:
-                print("Scanning for 1-Wire devices...")
-                roms = self.ds_sensor.scan()
-                print(f"Found {len(roms)} Dallas temperature sensor(s).")
-    
-                if not roms:
-                    print("No sensors found. Check your wiring and pull-up resistor.")
-                    return
+            # 2. If no sensors were found initially, warn and wait before trying again
+            if not self.roms:
+                print("No sensors found. Check your wiring and pull-up resistor.")
+                await asyncio.sleep(10)
                 
-            except Exception as e:
-                print(f"Error occurred while reading DS18X20 sensor: {e}")
-            await asyncio.sleep(10)  # Send every 10 seconds
+                # Optional: Attempt a rescue rescan if you want to support hot-plugging
+                try:
+                    self.roms = self.ds_sensor.scan()
+                except:
+                    pass
+                continue
 
             try:
                 # Start temperature conversion across all sensors
                 self.ds_sensor.convert_temp()
                 
-                # Yield control to the event loop during the 750ms conversion time
+                # Yield control during the 750ms conversion time
                 await asyncio.sleep_ms(750)
                 
                 # Read data from each discovered sensor
-                for rom in roms:
+                for rom in self.roms:
                     rom_address = ''.join(['{:02x}'.format(b) for b in rom])
                     temp_c = self.ds_sensor.read_temp(rom)
                     
                     print(f"Temp: {temp_c:.2f}°C")
+                    
+                    # Store the last read value for your Web UI f-string variable!
+                    self.temp = f"{temp_c:.1f}"
+                    # (Make sure self.hum is also initialized to something like "N/A" or 0)
+
+                    # Check if the address doesn't exist in your mapping dictionary
+                    if rom_address not in self.CALIBRATION_MAP:
+                        print(f"ALERT: Unregistered sensor found! ROM: {rom_address}")
+                    
+                    # Grab calibration tuple or default to safe uncalibrated bypass (1.0, 0.0)
+                    multiplier, offset = self.CALIBRATION_MAP.get(rom_address, (1.0, 0.0))
+                    
+                    # Calculate real temperature: (reading * m) + c
+                    calibrated_temp = (temp_c * multiplier) + offset
+
+                    await self.write_ds18x20_to_oled(temp_c)
+
                     payload = json.dumps({"esp32_s2_dallas_temperature": temp_c})
-                    self.mqtt.publish(f"homeassistant/sensor/{g.mac}/state", payload)
-                
+                    await self.mqtt.publish(f"homeassistant/sensor/{g.mac}/state", payload)
+                    
             except Exception as e:
                 print("Error reading sensor:", e)
-
+                
+            await asyncio.sleep(10)  # Send every 10 seconds
 
     async def mqtt_listener_loop(self):
         print("MQTT Listener started...")
@@ -735,8 +799,9 @@ class SmartHomeManager:
             asyncio.create_task(self.announce_to_home_assistant(g.mac))
             asyncio.create_task(self.mqtt_listener_loop())
             asyncio.create_task(self.mqtt_processor_loop())
-            #asyncio.create_task(self.mqtt_send_dht_loop())
-            if self.ds18x20_pin is not None:
+            if self.dht_sensor is not None:
+                asyncio.create_task(self.mqtt_send_dht_loop())
+            if len(self.roms) > 0:
                 asyncio.create_task(self.mqtt_send_ds18x20_loop())
 
         except Exception as e:
