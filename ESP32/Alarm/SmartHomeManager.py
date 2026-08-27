@@ -3,15 +3,11 @@ import json, ntptime, time, ds1302 # type: ignore
 from machine import RTC, Pin, SoftI2C # type: ignore
 from microdot.microdot import Microdot
 import gc, network # type: ignore
-from mysecrets import secrets
+# from mysecrets import secrets
 import mqtt as MQTT
 import wifi_as as WIFI
 import globals as g
-import dht # type: ignore
-import onewire # type: ignore
 from writer import Writer
-import freesans20
-import courier20
 
 class SmartHomeManager:
     STORAGE_FILE = "alarms.json"
@@ -29,9 +25,11 @@ class SmartHomeManager:
         self.subscribed = False
         self.subscribe_topic = None
 
+        self.dht_sensor = None
         self.temp = None
         self.hum = None
         if dhtPin is not None:
+            import dht # type: ignore
             self.dht_sensor = dht.DHT11(Pin(dhtPin))  # Initialize DHT11 sensor on specified GPIO
 
         self.ds_sensor = None
@@ -39,6 +37,7 @@ class SmartHomeManager:
         self.temp_c = None
         if owPin is not None:
             import ds18x20 # type: ignore
+            import onewire # type: ignore
             ow = onewire.OneWire(Pin(owPin))  # Initialize OneWire on specified GPIO
             self.ds_sensor = ds18x20.DS18X20(ow)
             print("MQTT DS18X20 Sender Task started...")
@@ -52,35 +51,22 @@ class SmartHomeManager:
 
         if scl is not None and sda is not None:
             import ssd1306  # type: ignore
-            from writer import Writer
             #import freesans20
             import courier20
 
-            # Use SoftI2C to avoid peripheral conflicts
             i2c = SoftI2C(scl=Pin(scl), sda=Pin(sda))
-
-            # Test scanning for the display address (should print [60] or [0x3C])
-            print("I2C Scan:", i2c.scan())
-
-            # Define display size
             width = 128
             height = 64
-
-            # Create the display object (default I2C address is 0x3C)
             self.oled = ssd1306.SSD1306_I2C(width, height, i2c)
             self.w = Writer(self.oled, courier20)
-
-            # Updated database mapping your sensor ROM to the corrected slope and intercept
             self.CALIBRATION_MAP = {
-                "2894816b00000071": (0.98172, -0.16892), 
+                "2894816b00000071": (0.0, 0.0), #(0.98172, -0.16892), 
             }
 
-    async def write_ds18x20_to_oled(self, temp_c, line=0):
-
-        print(f"Temp: {temp_c:.2f}°C")
+    async def write_ds18x20_to_oled(self, text, line=0):
         Writer.set_textpos(self.oled, line * 20, 0)
-        #w.printstring(f"Temp: {temp_c:.2f} {calibrated_temp:.2f} C")
-        self.w.printstring(f"012345678 {temp_c:.2f} 012345678")
+        #self.w.printstring(f"012345678 {temp:.2f} 012345678")
+        self.w.printstring(f"{text}")
         self.oled.show()
 
     def getTime(self):
@@ -413,7 +399,7 @@ class SmartHomeManager:
                 </div>
 
                 {temp_html_block}
-                
+
                 <h2>Active Alarms</h2>
                 <ul>{rows if rows else "<li>No alarms set</li>"}</ul>
                 <hr>
@@ -552,7 +538,9 @@ class SmartHomeManager:
             await asyncio.sleep(10)  # Send every 10 seconds
 
     async def mqtt_send_ds18x20_loop(self):
+        loop_counter = 0  # Tracks elapsed seconds
         while True:
+            loop_counter += 1
             # 2. If no sensors were found initially, warn and wait before trying again
             if not self.roms:
                 print("No sensors found. Check your wiring and pull-up resistor.")
@@ -577,7 +565,7 @@ class SmartHomeManager:
                     rom_address = ''.join(['{:02x}'.format(b) for b in rom])
                     temp_c = self.ds_sensor.read_temp(rom)
                     
-                    print(f"Temp: {temp_c:.2f}°C")
+                    print(f"{rom_address} Temp: {temp_c:.2f}°C")
                     
                     # Store the last read value for your Web UI f-string variable!
                     self.temp = f"{temp_c:.1f}"
@@ -593,11 +581,15 @@ class SmartHomeManager:
                     # Calculate real temperature: (reading * m) + c
                     calibrated_temp = (temp_c * multiplier) + offset
 
-                    await self.write_ds18x20_to_oled(temp_c)
+                    # 1. Update the OLED display safely
+                    await self.write_ds18x20_to_oled(f"  {temp_c:.2f}  ", 1)
+                    try:
+                        payload = json.dumps({"esp32_s2_dallas_temperature": temp_c})
+                        self.mqtt.publish(f"homeassistant/sensor/{g.mac}/state", payload)
+                        
+                    except Exception as mqtt_err:
+                        print(f"Network warning: Could not publish state over MQTT ({mqtt_err})")
 
-                    payload = json.dumps({"esp32_s2_dallas_temperature": temp_c})
-                    await self.mqtt.publish(f"homeassistant/sensor/{g.mac}/state", payload)
-                    
             except Exception as e:
                 print("Error reading sensor:", e)
                 
@@ -801,6 +793,7 @@ class SmartHomeManager:
             asyncio.create_task(self.mqtt_processor_loop())
             if self.dht_sensor is not None:
                 asyncio.create_task(self.mqtt_send_dht_loop())
+            print("len(self.roms):", len(self.roms))
             if len(self.roms) > 0:
                 asyncio.create_task(self.mqtt_send_ds18x20_loop())
 
