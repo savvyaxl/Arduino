@@ -14,7 +14,7 @@ class SmartHomeManager:
     PINDEF_FILE = "pin_definitions.json"
     DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-    def __init__(self, utc_offset=-3, dhtPin=None, owPin=None, scl=Pin(7), sda=Pin(9)):
+    def __init__(self, utc_offset=-3, dhtPin=None, owPin=None, ssd1306=None, stepper_config=None):
         self.rtc = RTC()
         self.offset = utc_offset * 3600
         self.alarms = self._load_alarms()
@@ -49,19 +49,25 @@ class SmartHomeManager:
                 print(f"Initial scan failed: {e}")
                 self.roms = []
 
-        if scl is not None and sda is not None:
+        self.oled = None
+        if ssd1306 is not None:
             import ssd1306  # type: ignore
             #import freesans20
             import courier20
 
-            i2c = SoftI2C(scl=Pin(scl), sda=Pin(sda))
+            i2c = SoftI2C(scl=Pin(ssd1306["scl"]), sda=Pin(ssd1306["sda"]))
             width = 128
             height = 64
             self.oled = ssd1306.SSD1306_I2C(width, height, i2c)
             self.w = Writer(self.oled, courier20)
             self.CALIBRATION_MAP = {
-                "2894816b00000071": (0.0, 0.0), #(0.98172, -0.16892), 
+                "2894816b00000071": (1.0, 0.0), #(0.98172, -0.16892), 
             }
+
+        self.stepper = None
+        if stepper_config is not None:
+            import stepper
+            self.stepper = stepper.stepper(stepper=stepper_config)
 
     async def write_ds18x20_to_oled(self, text, line=0):
         Writer.set_textpos(self.oled, line * 20, 0)
@@ -244,7 +250,10 @@ class SmartHomeManager:
 
         @self.app.route('/get-temp')
         async def get_temp(request):
-                return f"{self.temp} {self.hum}", 200, {'Content-Type': 'text/plain; charset=utf-8'}
+            if self.hum is None:
+                return f"{self.temp} °C", 200, {'Content-Type': 'text/plain; charset=utf-8'}
+            else:
+                return f"{self.temp} °C {self.hum} %", 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
         @self.app.route('/')
         async def index(request):
@@ -540,7 +549,6 @@ class SmartHomeManager:
     async def mqtt_send_ds18x20_loop(self):
         loop_counter = 0  # Tracks elapsed seconds
         while True:
-            loop_counter += 1
             # 2. If no sensors were found initially, warn and wait before trying again
             if not self.roms:
                 print("No sensors found. Check your wiring and pull-up resistor.")
@@ -564,36 +572,25 @@ class SmartHomeManager:
                 for rom in self.roms:
                     rom_address = ''.join(['{:02x}'.format(b) for b in rom])
                     temp_c = self.ds_sensor.read_temp(rom)
-                    
-                    print(f"{rom_address} Temp: {temp_c:.2f}°C")
-                    
-                    # Store the last read value for your Web UI f-string variable!
-                    self.temp = f"{temp_c:.1f}"
-                    # (Make sure self.hum is also initialized to something like "N/A" or 0)
-
-                    # Check if the address doesn't exist in your mapping dictionary
-                    if rom_address not in self.CALIBRATION_MAP:
-                        print(f"ALERT: Unregistered sensor found! ROM: {rom_address}")
-                    
-                    # Grab calibration tuple or default to safe uncalibrated bypass (1.0, 0.0)
+                    #print(f"{rom_address} Temp: {temp_c:.2f}°C")
                     multiplier, offset = self.CALIBRATION_MAP.get(rom_address, (1.0, 0.0))
-                    
-                    # Calculate real temperature: (reading * m) + c
                     calibrated_temp = (temp_c * multiplier) + offset
-
+                    self.temp = f"{calibrated_temp:.2f}"
                     # 1. Update the OLED display safely
-                    await self.write_ds18x20_to_oled(f"  {temp_c:.2f}  ", 1)
-                    try:
-                        payload = json.dumps({"esp32_s2_dallas_temperature": temp_c})
-                        self.mqtt.publish(f"homeassistant/sensor/{g.mac}/state", payload)
-                        
-                    except Exception as mqtt_err:
-                        print(f"Network warning: Could not publish state over MQTT ({mqtt_err})")
+                    await self.write_ds18x20_to_oled(f"  {self.temp}  ", 1)
+                    if loop_counter % 10 == 0:
+                        try:
+                            payload = json.dumps({"esp32_s2_dallas_temperature": self.temp})
+                            self.mqtt.publish(f"homeassistant/sensor/{g.mac}/state", payload)
+                            
+                        except Exception as mqtt_err:
+                            print(f"Network warning: Could not publish state over MQTT ({mqtt_err})")
 
             except Exception as e:
                 print("Error reading sensor:", e)
                 
-            await asyncio.sleep(10)  # Send every 10 seconds
+            await asyncio.sleep_ms(250)
+            loop_counter += 1
 
     async def mqtt_listener_loop(self):
         print("MQTT Listener started...")

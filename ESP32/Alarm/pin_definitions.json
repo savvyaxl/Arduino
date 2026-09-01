@@ -11,11 +11,11 @@
         "value_template_addon": " | round(1)",
         "unit_of_measurement": "°C"
     },
-    "ESP32 S2 Humidity": {
-        "type": "sensor",
+    "ESP32 S2 Pump": {
+        "type": "pump",
         "pins": [5],
-        "device_class": "humidity",
+        "device_class": "water",
         "value_template_addon": " | round(1)",
-        "unit_of_measurement": "°C"
+        "unit_of_measurement": "mL"
     }
 }
