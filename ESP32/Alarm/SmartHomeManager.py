@@ -1,12 +1,10 @@
 import uasyncio as asyncio # type: ignore
-import json, ntptime, time, ds1302 # type: ignore
+import json, ntptime, time # type: ignore
 from machine import RTC, Pin, SoftI2C # type: ignore
-from microdot.microdot import Microdot
 import gc, network # type: ignore
 # from mysecrets import secrets
-import mqtt as MQTT
-import wifi_as as WIFI
-import globals as g
+
+
 from writer import Writer
 
 class SmartHomeManager:
@@ -14,19 +12,40 @@ class SmartHomeManager:
     PINDEF_FILE = "pin_definitions.json"
     DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-    def __init__(self, utc_offset=-3, dhtPin=None, owPin=None, ssd1306=None, stepper_config=None):
+    def __init__(self, wifi_enabled=False, RTC_enabled=False, mqtt_enabled=False, web_enabled=False, alarms_enabled=False, utc_offset=-3, dhtPin=None, owPin=None, ssd1306=None, stepper_config=None):
         self.rtc = RTC()
         self.offset = utc_offset * 3600
         self.alarms = self._load_alarms()
         self.allowed_pins = self._load_pin_definitions()
-        self.app = Microdot()
-        self._setup_routes()
-        self.mqtt = MQTT.MQTTHandler()
+        self.alarms_enabled = alarms_enabled
+        self.RTC_enabled = RTC_enabled
+        self.ds = None
+
+        self.wifi_enabled = wifi_enabled
+        if self.wifi_enabled:
+            import wifi_as as WIFI
+            import globals as g
+        
         self.subscribed = False
         self.subscribe_topic = None
 
+        if self.RTC_enabled:
+            import ds1302
+            self.ds = ds1302.DS1302(clk=Pin(1), dio=Pin(2), cs=Pin(3))
+
+        self.mqtt = None
+        if mqtt_enabled:
+            import mqtt as MQTT
+            self.mqtt = MQTT.MQTTHandler()
+
+        self.app = None
+        if web_enabled:
+            from microdot.microdot import Microdot
+            self.app = Microdot()
+            self._setup_routes()
+
         self.dht_sensor = None
-        self.temp = None
+        self.temp = None    
         self.hum = None
         if dhtPin is not None:
             import dht # type: ignore
@@ -67,7 +86,7 @@ class SmartHomeManager:
         self.stepper = None
         if stepper_config is not None:
             import stepper
-            self.stepper = stepper.stepper(stepper=stepper_config)
+            self.stepper = stepper.Stepper(stepper=stepper_config)
 
     async def write_ds18x20_to_oled(self, text, line=0):
         Writer.set_textpos(self.oled, line * 20, 0)
@@ -103,14 +122,8 @@ class SmartHomeManager:
 
     async def sync_time(self):
         while True:
-            gc.collect()
             try:
-                ds = ds1302.DS1302(clk=Pin(1), dio=Pin(2), cs=Pin(3))
-            except:
-                print("Failed to initialize DS1302")
-
-            try:
-                t = ds.date_time()
+                t = self.ds.date_time()
                 if t[0] == 2165 or t[1] == 165:
                     print("No RTC attached - check wiring!")
                 else:
@@ -126,7 +139,7 @@ class SmartHomeManager:
                 tm = time.localtime(t)
                 # ESP32 RTC: (y, m, d, wd, h, m, s, ss)
                 self.rtc.datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
-                ds.date_time((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5]))
+                self.ds.date_time((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5]))
                 print(f"NTP Sync Successful {tm[0]}-{tm[1]:02d}-{tm[2]:02d} {tm[3]:02d}:{tm[4]:02d}:{tm[5]:02d}")
                 return True # Tell the caller we are done!
             except:
@@ -610,38 +623,49 @@ class SmartHomeManager:
 
             # 2. Evaluate if network or MQTT connection has been dead for 15 minutes
             if (time.time() - last_healthy_time) > TIMEOUT_SEC:
-                print(f"System link down for {TIMEOUT_SEC} secs. Running passive network recovery...")
                 try:
-                    sta_if = network.WLAN(network.STA_IF)
-                    # Step A: Reconnect Wi-Fi asynchronously if the router dropped
-                    if not sta_if.isconnected():
-                        print("Router link down. Starting background Wi-Fi recovery...")
-                        await WIFI.reconnect_wifi_async()
-                        gc.collect()
-
-                    # Step B: Rebuild MQTT architecture if Wi-Fi interface is valid
-                    if sta_if.isconnected():
-                        print("Wi-Fi network confirmed. Restoring MQTT client context...")
-                        try:
-                            await WIFI.reconnect_wifi_async()
-                            print("disconnecting frm MQTT...")
-                            self.mqtt.disconnect()
-                        except Exception:
-                            pass
-                        gc.collect()
-                        await asyncio.wait_for(self.connect_mqtt_async(), timeout=15)
-                        await asyncio.wait_for(self.subscribe(self.subscribe_topic), timeout=15)
-                        print("Network communication pipeline completely restored.")
-                    else:
-                        print("Router infrastructure still down. Local tasks operating natively...")
-                        
+                    await asyncio.wait_for(self.connect_mqtt_async(), timeout=15)
+                    await asyncio.wait_for(self.subscribe(self.subscribe_topic), timeout=15)
                 except Exception as recovery_error:
                     print(f"Recovery cycle deferred: {recovery_error}")
                     retry_subscribe = True
                     gc.collect()
+                last_healthy_time = time.time()
+
+            # # 2. Evaluate if network or MQTT connection has been dead for 15 minutes
+            # if (time.time() - last_healthy_time) > TIMEOUT_SEC:
+            #     print(f"System link down for {TIMEOUT_SEC} secs. Running passive network recovery...")
+            #     try:
+            #         sta_if = network.WLAN(network.STA_IF)
+            #         # Step A: Reconnect Wi-Fi asynchronously if the router dropped
+            #         if not sta_if.isconnected():
+            #             print("Router link down. Starting background Wi-Fi recovery...")
+            #             await WIFI.reconnect_wifi_async()
+            #             gc.collect()
+
+            #         # Step B: Rebuild MQTT architecture if Wi-Fi interface is valid
+            #         if sta_if.isconnected():
+            #             print("Wi-Fi network confirmed. Restoring MQTT client context...")
+            #             try:
+            #                 await WIFI.reconnect_wifi_async()
+            #                 print("disconnecting frm MQTT...")
+            #                 self.mqtt.disconnect()
+            #             except Exception:
+            #                 pass
+            #             gc.collect()
+            #             await asyncio.wait_for(self.connect_mqtt_async(), timeout=15)
+            #             await asyncio.wait_for(self.subscribe(self.subscribe_topic), timeout=15)
+            #             print("Network communication pipeline completely restored.")
+            #         else:
+            #             print("Router infrastructure still down. Local tasks operating natively...")
+                        
+            #     except Exception as recovery_error:
+            #         print(f"Recovery cycle deferred: {recovery_error}")
+            #         retry_subscribe = True
+            #         gc.collect()
 
                 # Advance baseline pointer to maintain non-aggressive spacing between checks
-                last_healthy_time = time.time()
+                # last_healthy_time = time.time()
 
             # Essential yield step keeps the Web Server and Alarm loops completely unblocked
             await asyncio.sleep(1)
@@ -772,35 +796,61 @@ class SmartHomeManager:
                 print(f"Error occurred while publishing MQTT config for {name}: {e}")
 
     async def run(self):
-        count = 0
-        while not await self.sync_time() and count < 5:  # Try syncing time up to 5 times
-            print("Initial sync failed, retrying...")
-            await asyncio.sleep(1)
-            count += 1
+        if self.RTC_enabled:
+            import ds1302
+            count = 0
+            while not await self.sync_time() and count < 5:  # Try syncing time up to 5 times
+                print("Initial sync failed, retrying...")
+                await asyncio.sleep(1)
+                count += 1
 
-        try:
-            self.mqtt.connect()
-        except Exception as e:
-            print(f"Error in run occurred while connecting to MQTT: {e}")
+        if self.mqtt is not None:
+            try:
+                self.mqtt.connect()
+            except Exception as e:
+                print(f"Error in run occurred while connecting to MQTT: {e}")
+
+            try:
+                await asyncio.sleep(2)
+                asyncio.create_task(self.announce_to_home_assistant(g.mac))
+                asyncio.create_task(self.mqtt_listener_loop())
+                asyncio.create_task(self.mqtt_processor_loop())
+                if self.dht_sensor is not None:
+                    asyncio.create_task(self.mqtt_send_dht_loop())
+                if len(self.roms) > 0:
+                    asyncio.create_task(self.mqtt_send_ds18x20_loop())
+
+            except Exception as e:
+                print(f"Error in run subscribe, publish in MQTT: {e}")
+
+
+        if self.stepper is not None:
+            try:
+                asyncio.create_task(self.stepper.pump_volume_async(pump={"ml": 5.5, "flow_rate_ml_min": 400.0, "clockwise": False}))
+            except Exception as e:
+                print(f"Error in run occurred while starting stepper loop: {e}")
+
 
         try:
             await asyncio.sleep(2)
-            asyncio.create_task(self.announce_to_home_assistant(g.mac))
-            asyncio.create_task(self.mqtt_listener_loop())
-            asyncio.create_task(self.mqtt_processor_loop())
             if self.dht_sensor is not None:
                 asyncio.create_task(self.mqtt_send_dht_loop())
-            print("len(self.roms):", len(self.roms))
             if len(self.roms) > 0:
                 asyncio.create_task(self.mqtt_send_ds18x20_loop())
 
         except Exception as e:
             print(f"Error in run subscribe, publish in MQTT: {e}")
 
+        # sync time
         asyncio.create_task(self.continuous_time_sync())
-        asyncio.create_task(self.alarm_checker_loop())
-        print("Server running on port 80...")
-        await self.app.start_server(port=80)
+
+        if self.alarms_enabled:
+            asyncio.create_task(self.alarm_checker_loop())
+            
+        if self.app is not None:
+            print("Web server is enabled. Starting server on port 80...")
+            await self.app.start_server(port=80)
+        
 
 # --- 3. Entry Point ---
 if __name__ == "__main__":
