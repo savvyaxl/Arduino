@@ -22,14 +22,15 @@ class Stepper:
         self.enable.value(1) 
 
 
-    def pump_volume(self, pump={"ml": 5.5, "flow_rate_ml_min": 400.0, "clockwise": False}):
+    async def pump_volume(self, pump={"ml": 5.5, "flow_rate_ml_min": 400.0, "clockwise": False}):
+        # 1. Capture the start time
+        start_time = time.ticks_ms()
+        
         self.enable.value(0)
-        time.sleep_us(200)
+        await asyncio.sleep_ms(200)
         total_steps = int(pump["ml"] * self.STEPS_PER_ML)
         
         # Calculate the step delay required to match the target flow rate
-        # Flow rate in revs per second = (flow_rate_ml_min / 60) / ML_PER_REV
-        # Total steps per second = revs_per_second * STEPS_PER_REV
         revs_per_min = pump["flow_rate_ml_min"] / self.ML_PER_REV
         steps_per_second = (revs_per_min / 60.0) * self.STEPS_PER_REV
         
@@ -47,8 +48,12 @@ class Stepper:
             time.sleep_us(delay_us)
 
         self.enable.value(1) 
-        print("Dosing complete.")
-
+        
+        # 2. Calculate the difference and convert milliseconds to seconds
+        duration_ms = time.ticks_diff(time.ticks_ms(), start_time)
+        duration_sec = duration_ms / 1000.0
+        
+        print(f"Dosing complete. Took {duration_sec:.2f} seconds.")
 
     async def pump_volume_async(self, pump={"ml": 5.5, "flow_rate_ml_min": 400.0, "clockwise": False}):
         self.enable.value(0)

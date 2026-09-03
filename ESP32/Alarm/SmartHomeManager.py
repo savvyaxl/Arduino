@@ -12,7 +12,19 @@ class SmartHomeManager:
     PINDEF_FILE = "pin_definitions.json"
     DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-    def __init__(self, wifi_enabled=False, RTC_enabled=False, mqtt_enabled=False, web_enabled=False, alarms_enabled=False, utc_offset=-3, dhtPin=None, owPin=None, ssd1306=None, stepper_config=None):
+    def __init__(
+            self, 
+            wifi_enabled=False,
+            RTC_enabled=False, 
+            mqtt_enabled=False, 
+            web_enabled=False, 
+            alarms_enabled=False, 
+            utc_offset=-3, 
+            dhtPin=None, 
+            owPin=None, 
+            ssd1306=None, 
+            stepper_config=None
+        ):
         self.rtc = RTC()
         self.offset = utc_offset * 3600
         self.alarms = self._load_alarms()
